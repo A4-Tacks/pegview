@@ -1,4 +1,10 @@
-use std::{fmt::{Debug, Display}, iter::{once, repeat_n}, mem::take, ops::{BitAndAssign, BitOrAssign, ControlFlow}, sync::atomic::{AtomicBool, Ordering::*}};
+use std::{
+    fmt::{Debug, Display},
+    iter::{once, repeat_n},
+    mem::take,
+    ops::{BitAndAssign, BitOrAssign, ControlFlow},
+    sync::atomic::{AtomicBool, Ordering::*},
+};
 
 use itermaps::short_funcs::{default, into};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
@@ -200,103 +206,6 @@ impl Sides {
         self.1.concat(&parent.1);
     }
 }
-//#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
-//pub enum Sides {
-//    Empty,
-//    JL,
-//    JR,
-//    JLR,
-//    ExtL,
-//    ExtR,
-//    ExtLR,
-//    ExtJL,
-//    ExtJR,
-//    ExtJLR,
-//}
-//impl Default for Sides {
-//    fn default() -> Self {
-//        Self::Empty
-//    }
-//}
-//impl Sides {
-//    const L_CH: char = '└';
-//    const R_CH: char = '┘';
-//    const LJ_CH: char = '├';
-//    const RJ_CH: char = '┤';
-//    const EXT_CH: char = '│';
-//
-//    pub fn split(self) -> (Self, Self, Self) {
-//        use Sides::*;
-//        match self {
-//            Empty => Default::default(),
-//            JL => (JL, Empty, Empty),
-//            JR => (Empty, Empty, JR),
-//            JLR => (JL, Empty, JR),
-//            ExtL => (ExtL, Empty, Empty),
-//            ExtR => (Empty, Empty, ExtR),
-//            ExtLR => (ExtLR, Empty, ExtR),
-//            ExtJL => (ExtJL, Empty, Empty),
-//            ExtJR => (Empty, Empty, ExtJR),
-//            ExtJLR => (ExtJLR, Empty, ExtJR),
-//        }
-//    }
-//
-//    pub fn to_hang(self) -> Self {
-//        use Sides::*;
-//        match self {
-//            JL => ExtL,
-//            JR => ExtR,
-//            JLR => ExtLR,
-//            ExtL | ExtR | ExtLR => self,
-//            ExtJL => ExtL,
-//            ExtJR => ExtR,
-//            ExtJLR => ExtLR,
-//            Empty => Empty,
-//        }
-//    }
-//
-//    pub fn merge(&mut self, up: Self) -> Self {
-//        use Sides::*;
-//        let [l, r] = match up {
-//            Empty => (false, false),
-//            JL | ExtL | ExtJL => (true, false),
-//            JR | ExtR | ExtJR => (false, true),
-//            JLR | ExtLR | ExtJLR => (true, true),
-//        };
-//        todo!()
-//    }
-//
-//    pub fn sides(self) -> (Option<char>, Option<char>) {
-//        match self {
-//            Sides::Empty => default(),
-//            Sides::JL => (Some(Self::L_CH), None),
-//            Sides::JR => (None, Some(Self::R_CH)),
-//            Sides::JLR => (Some(Self::L_CH), Some(Self::R_CH)),
-//            Sides::ExtL => (Some(Self::EXT_CH), None),
-//            Sides::ExtR => (None, Some(Self::EXT_CH)),
-//            Sides::ExtLR => (Some(Self::EXT_CH), Some(Self::EXT_CH)),
-//            Sides::ExtJL => (Some(Self::LJ_CH), None),
-//            Sides::ExtJR => (None, Some(Self::RJ_CH)),
-//            Sides::ExtJLR => (Some(Self::LJ_CH), Some(Self::RJ_CH)),
-//        }
-//    }
-//
-//    pub fn width(self) -> usize {
-//        let (a, b) = self.sides();
-//        [a, b].iter()
-//            .map(Option::is_some)
-//            .map(into::<_, usize>)
-//            .sum()
-//    }
-//
-//    /// Returns `true` if the sides is [`Empty`].
-//    ///
-//    /// [`Empty`]: Sides::Empty
-//    #[must_use]
-//    pub fn is_empty(&self) -> bool {
-//        matches!(self, Self::Empty)
-//    }
-//}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Attr {
