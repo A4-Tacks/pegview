@@ -13,6 +13,7 @@ fn main() {
         .optflag("u", "unique-line", "One rule one line")
         .optflag("e", "exclude-fails", "Exclude failed matches")
         .optflag("h", "help", "Show help messages")
+        .optflag("v", "version", "Show version")
         .parsing_style(getopts::ParsingStyle::FloatingFrees);
 
     let result = options.parse(args().skip(1));
@@ -27,6 +28,11 @@ fn main() {
         let biref = options.short_usage(env!("CARGO_BIN_NAME"));
         let usage = options.usage(&biref);
         println!("{usage}");
+        println!("Report bugs from {} issues", env!("CARGO_PKG_REPOSITORY"));
+        exit(0)
+    }
+    if matched.opt_present("v") {
+        println!("{}", env!("CARGO_PKG_VERSION"));
         exit(0)
     }
 
