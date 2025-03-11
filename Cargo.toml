@@ -1,0 +1,11 @@
+[package]
+name = "pegview"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+getopts = "0.2.21"
+itermaps = "0.3.3"
+line-column = "0.1.2"
+peg = "0.8.5"
+unicode-width = "0.2.0"
