@@ -52,7 +52,7 @@ checksum = "132dca9b868d927b35b5dd728167b2dee150eb1ad686008fc71ccb298b776fca"
 
 [[package]]
 name = "pegview"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "getopts",
  "itermaps",

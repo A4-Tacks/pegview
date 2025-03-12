@@ -69,6 +69,7 @@ macro_rules! do_op {
 
 pub static CENTER_NAME: AtomicBool = AtomicBool::new(false);
 pub static FULL_WIDTH_TAB: AtomicBool = AtomicBool::new(false);
+pub static UNQUOTE_SPACE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Loc {
@@ -457,7 +458,7 @@ impl<'a> ColLine<'a> {
                         extendeds.push((
                                 col,
                                 elem.exts+1,
-                                elem.width() + tail.width()
+                                elem.width() + tail.width(),
                         ));
 
                         skips.extend(repeat(i)
@@ -570,6 +571,7 @@ impl DChar {
     pub fn width(&self) -> usize {
         match self.0 {
             '\'' => 4,
+            ' ' if UNQUOTE_SPACE.load(Acquire) => 1,
             ' ' => 3,
             ch if ch.is_control() => {
                 ch.escape_debug().count()+2
@@ -583,9 +585,10 @@ impl DChar {
 impl Display for DChar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let &Self(ch) = self;
-        let printable = ch != ' '
+        let printable = (ch != ' ' || UNQUOTE_SPACE.load(Acquire))
             && ch != '\''
             && !ch.is_control();
+
         if printable {
             write!(f, "{ch}")
         } else {

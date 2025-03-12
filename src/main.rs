@@ -21,6 +21,7 @@ fn main() {
         .optflag("e", "exclude-fails", "Exclude failed matches")
         .optflag("w", "full-width-tab-chars", "Full-width tab chars")
         .optflag("s", "fake-source", "Using oneline fake source")
+        .optflag("q", "unquote-space", "Unquote space")
         .optflag("h", "help", "Show help messages")
         .optflag("v", "version", "Show version")
         .parsing_style(getopts::ParsingStyle::FloatingFrees);
@@ -49,8 +50,10 @@ fn main() {
     let exclude_fail = matched.opt_present("e");
     let mut fake_source = matched.opt_present("s").then(String::new);
     let ignore_set = BTreeSet::from_iter(matched.opt_strs("i"));
+
     CENTER_NAME.store(matched.opt_present("c"), Ordering::Release);
     FULL_WIDTH_TAB.store(matched.opt_present("w"), Ordering::Release);
+    UNQUOTE_SPACE.store(matched.opt_present("q"), Ordering::Release);
 
     let buf = &mut String::new();
     if matched.free.is_empty() {
