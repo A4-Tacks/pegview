@@ -12,6 +12,20 @@ const BINNAME: &str = env!("CARGO_BIN_NAME");
 
 use pegview::*;
 
+fn colline_from_src(src: &str) -> ColLine<'_> {
+    let mut colline = ColLine::new();
+    let mut i = 0;
+    for ch in src.chars() {
+        let elem = Elem::new_left(ch);
+        colline.push(elem, i, 1, false);
+        i += 1;
+    }
+    // 填充末尾, 防止末尾匹配下降过头
+    let elem = Elem::new_fill();
+    colline.push(elem, i, 1, false);
+    colline
+}
+
 fn main() {
     let mut options = getopts::Options::new();
     options
@@ -140,26 +154,29 @@ fn main() {
     for actions in &regions {
         println!("----------------------------------------------------------");
         if let Some(src) = actions.iter().find_map(Action::as_begin) {
-            println!("Trace Source: {src:?}");
-            let mut colline = ColLine::new();
-            let mut i = 0;
-            for ch in src.chars() {
-                let elem = Elem::new_left(ch);
-                colline.push(elem, i, 1, false);
-                i += 1;
+            let mut colline = colline_from_src(src);
+            let tidx = |loc: &Loc| {
+                loc.to_index(src).cinto::<u32>()
+            };
+
+            for action in actions {
+                match action {
+                    Action::Other { text } => {
+                        println!("{text}");
+                    },
+                    Action::Begin { source } => {
+                        debug_assert_eq!(src, *source);
+                        println!("Trace Source: {source:?}");
+                    },
+                    _ => (),
+                }
             }
-            // 填充末尾, 防止末尾匹配下降过头
-            let elem = Elem::new_fill();
-            colline.push(elem, i, 1, false);
 
             for action in actions {
                 match action {
                     Action::Matched { name, start, stop } => {
                         if ignored(*name) { continue; }
-                        let [start, stop]: [u32; 2] = [
-                            start.to_index(src).cinto(),
-                            stop.to_index(src).cinto(),
-                        ];
+                        let [start, stop]: [u32; 2] = [start, stop].map(tidx);
                         let len = stop-start;
                         let name = if len == 0 {
                             let attr = Attr {
@@ -175,7 +192,7 @@ fn main() {
                     },
                     Action::Failed { name, start } => {
                         if ignored(*name) { continue; }
-                        let start = start.to_index(src).cinto();
+                        let start = tidx(start);
                         let elem = Elem::new(
                             *name,
                             " ",

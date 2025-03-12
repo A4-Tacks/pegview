@@ -30,7 +30,8 @@ peg::parser!(grammar p() for str {
             once(a).chain(b).reduce(ops::Add::add).unwrap()
         }
     rule trace<T>(r: rule<T>) -> T
-        = &(src:$([_]*) {
+        = &(start:position!() src:$([_]*) {
+            assert_eq!(start, 0, "only support trace from source start");
             #[cfg(feature = "trace")]
             println!("[PEG_INPUT_START]\n{src}\n[PEG_TRACE_START]");
         })
