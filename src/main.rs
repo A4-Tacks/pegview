@@ -1,7 +1,9 @@
 use itermaps::short_funcs::default;
 use std::{
-    collections::BTreeSet, env::args, io::{stdin, Read}, process::exit, sync::atomic::Ordering
+    collections::BTreeSet, env::args, fs, io::{stdin, Read}, process::exit, sync::atomic::Ordering
 };
+
+const BINNAME: &str = env!("CARGO_BIN_NAME");
 
 use pegview::*;
 
@@ -25,8 +27,8 @@ fn main() {
         },
     };
     if matched.opt_present("h") {
-        let biref = options.short_usage(env!("CARGO_BIN_NAME"));
-        let usage = options.usage(&biref);
+        let biref = options.short_usage(BINNAME);
+        let usage = options.usage(&format!("{biref} [FILES...]"));
         println!("{usage}");
         println!("Report bugs from {} issues", env!("CARGO_PKG_REPOSITORY"));
         exit(0)
@@ -42,7 +44,21 @@ fn main() {
     CENTER_NAME.store(matched.opt_present("c"), Ordering::Release);
 
     let buf = &mut String::new();
-    stdin().read_to_string(buf).unwrap();
+    if matched.free.is_empty() {
+        stdin().read_to_string(buf).unwrap();
+    } else {
+        for path in &matched.free {
+            let mut f = match fs::File::open(path) {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("error {path:?}: {e}");
+                    exit(e.raw_os_error().unwrap_or(3));
+                },
+            };
+            f.read_to_string(buf).unwrap();
+        }
+    }
+
     let actions = match parser::lines(buf) {
         Ok(x) => x,
         Err(e) => {
