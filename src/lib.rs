@@ -737,6 +737,25 @@ pub enum Action<'a> {
     },
 }
 impl<'a> Action<'a> {
+    pub fn locs(&self) -> Option<(Loc, Option<Loc>)> {
+        Some(match self {
+            Action::Matched { start, stop, .. }
+            => (start.clone(), stop.clone().into()),
+            Action::Attempting { start, .. }
+            | Action::Failed { start, .. }
+            | Action::CachedMatch { start, .. }
+            | Action::CachedFail { start, .. }
+            => (start.clone(), None),
+
+            | Action::Entering { .. }
+            | Action::Leaving { .. }
+            | Action::Begin { .. }
+            | Action::End
+            | Action::Other { .. }
+            => None?,
+        })
+    }
+
     /// Returns `true` if the action is [`Attempting`].
     ///
     /// [`Attempting`]: Action::Attempting
