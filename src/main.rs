@@ -17,6 +17,7 @@ fn main() {
     options
         .optflag("c", "center-rule", "Rule name to centered")
         .optmulti("i", "ignore", "Ignore a rule", "NAME")
+        .optmulti("I", "ignore-partial", "Ignore a rule, support partial pattern", "NAME")
         .optflag("u", "unique-line", "One rule one line")
         .optflag("e", "exclude-fails", "Exclude failed matches")
         .optflag("w", "full-width-tab-chars", "Full-width tab chars")
@@ -50,10 +51,17 @@ fn main() {
     let exclude_fail = matched.opt_present("e");
     let mut fake_source = matched.opt_present("s").then(String::new);
     let ignore_set = BTreeSet::from_iter(matched.opt_strs("i"));
+    let ignore_part_list = matched.opt_strs("I");
 
     CENTER_NAME.store(matched.opt_present("c"), Ordering::Release);
     FULL_WIDTH_TAB.store(matched.opt_present("w"), Ordering::Release);
     UNQUOTE_SPACE.store(matched.opt_present("q"), Ordering::Release);
+
+    let ignored = |s| {
+        ignore_set.contains(s)
+            || ignore_part_list.iter()
+                .any(|p| str::contains(s, p))
+    };
 
     let buf = &mut String::new();
     if matched.free.is_empty() {
@@ -147,7 +155,7 @@ fn main() {
             for action in actions {
                 match action {
                     Action::Matched { name, start, stop } => {
-                        if ignore_set.contains(*name) { continue; }
+                        if ignored(*name) { continue; }
                         let [start, stop]: [u32; 2] = [
                             start.to_index(src).cinto(),
                             stop.to_index(src).cinto(),
@@ -166,7 +174,7 @@ fn main() {
                         colline.push(elem, start, cols, uniq_line);
                     },
                     Action::Failed { name, start } => {
-                        if ignore_set.contains(*name) { continue; }
+                        if ignored(*name) { continue; }
                         let start = start.to_index(src).cinto();
                         let elem = Elem::new(
                             *name,
