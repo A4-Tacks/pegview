@@ -1,4 +1,4 @@
-use itermaps::fields;
+use itermaps::{fields, short_funcs::default};
 use std::{
     collections::BTreeSet,
     env::args,
@@ -37,6 +37,7 @@ fn main() {
         .optflag("w", "full-width-tab-chars", "Full-width tab chars")
         .optflag("s", "fake-source", "Using oneline fake source")
         .optflag("q", "unquote-space", "Unquote space")
+        .optflag("C", "show-cached", "Show cached match and fail")
         .optflag("h", "help", "Show help messages")
         .optflag("v", "version", "Show version")
         .parsing_style(getopts::ParsingStyle::FloatingFrees);
@@ -66,6 +67,7 @@ fn main() {
     let mut fake_source = matched.opt_present("s").then(String::new);
     let ignore_set = BTreeSet::from_iter(matched.opt_strs("i"));
     let ignore_part_list = matched.opt_strs("I");
+    let show_cached = matched.opt_present("C");
 
     CENTER_NAME.store(matched.opt_present("c"), Ordering::Release);
     FULL_WIDTH_TAB.store(matched.opt_present("w"), Ordering::Release);
@@ -181,6 +183,7 @@ fn main() {
                         let name = if len == 0 {
                             let attr = Attr {
                                 zero_width: true,
+                                ..default()
                             };
                             Entry::Str(name, attr)
                         } else {
@@ -196,7 +199,35 @@ fn main() {
                         let elem = Elem::new(
                             *name,
                             " ",
-                            Sides::bit_new(0b1101_0000),
+                            Sides::bit_new(0b0101_0000),
+                            ' ',
+                        );
+                        colline.push(elem, start, 1, uniq_line);
+                    },
+                    Action::CachedMatch { name, start } if show_cached => {
+                        if ignored(*name) { continue; }
+                        let start = tidx(start);
+                        let elem = Elem::new(
+                            Entry::Str(name, Attr {
+                                cached_match: true,
+                                ..default()
+                            }),
+                            " ",
+                            Sides::bit_new(0b0101_0000),
+                            ' ',
+                        );
+                        colline.push(elem, start, 1, uniq_line);
+                    },
+                    Action::CachedFail { name, start } if show_cached => {
+                        if ignored(*name) { continue; }
+                        let start = tidx(start);
+                        let elem = Elem::new(
+                            Entry::Str(name, Attr {
+                                cached_fail: true,
+                                ..default()
+                            }),
+                            " ",
+                            Sides::bit_new(0b0101_0000),
                             ' ',
                         );
                         colline.push(elem, start, 1, uniq_line);

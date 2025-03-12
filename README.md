@@ -10,5 +10,5 @@ Tree visualization of [rust-peg] trace
 - [x] Exclude failed rules
 - [x] Zero width matched view
 - [x] Full-width tab characters
-- [ ] Cached trace
+- [x] Cached trace
 - [ ] Precedence levels

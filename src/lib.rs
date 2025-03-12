@@ -210,18 +210,26 @@ impl Sides {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Attr {
     pub zero_width: bool,
+    pub cached_match: bool,
+    pub cached_fail: bool,
 }
 impl Attr {
     pub fn width(&self) -> usize {
-        [self.zero_width].into_iter().map(into::<_, usize>).sum()
+        [
+            self.zero_width,
+            self.cached_match,
+            self.cached_fail,
+        ].into_iter().map(into::<_, usize>).sum()
     }
     pub fn is_empty(&self) -> bool {
-        !(self.zero_width)
+        self.width() == 0
     }
 }
 impl Display for Attr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.zero_width { write!(f, "*")?; }
+        if self.cached_match { write!(f, "&")?; }
+        if self.cached_fail { write!(f, "!")?; }
         Ok(())
     }
 }
@@ -855,7 +863,7 @@ peg::parser!(pub grammar parser() for str {
             _ name:rule_name()
             _ "at"
             _ start:loc()
-            { Action::CachedMatch { name, start } }
+            { Action::CachedFail { name, start } }
         / "Entering level"
             _ level:num()
             { Action::Entering { level } }
