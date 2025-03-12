@@ -65,6 +65,9 @@ fn main() {
                 },
             };
             f.read_to_string(buf).unwrap();
+            if buf.chars().next_back().unwrap_or('\n') != '\n' {
+                buf.push('\n')
+            }
         }
     }
 
