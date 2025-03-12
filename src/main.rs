@@ -1,6 +1,11 @@
 use itermaps::short_funcs::default;
 use std::{
-    collections::BTreeSet, env::args, fs, io::{stdin, Read}, process::exit, sync::atomic::Ordering
+    collections::BTreeSet,
+    env::args,
+    fs,
+    io::{stdin, Read},
+    process::exit,
+    sync::atomic::Ordering,
 };
 
 const BINNAME: &str = env!("CARGO_BIN_NAME");
@@ -14,6 +19,7 @@ fn main() {
         .optmulti("i", "ignore", "Ignore a rule", "NAME")
         .optflag("u", "unique-line", "One rule one line")
         .optflag("e", "exclude-fails", "Exclude failed matches")
+        .optflag("w", "full-width-tab-chars", "Full-width tab chars")
         .optflag("h", "help", "Show help messages")
         .optflag("v", "version", "Show version")
         .parsing_style(getopts::ParsingStyle::FloatingFrees);
@@ -42,6 +48,7 @@ fn main() {
     let exclude_fail = matched.opt_present("e");
     let ignore_set = BTreeSet::from_iter(matched.opt_strs("i"));
     CENTER_NAME.store(matched.opt_present("c"), Ordering::Release);
+    FULL_WIDTH_TAB.store(matched.opt_present("w"), Ordering::Release);
 
     let buf = &mut String::new();
     if matched.free.is_empty() {

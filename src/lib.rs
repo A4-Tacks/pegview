@@ -1,6 +1,7 @@
 use std::{
+    collections::BTreeSet,
     fmt::{Debug, Display},
-    iter::{once, repeat_n},
+    iter::{once, repeat, repeat_n},
     mem::take,
     ops::{BitAndAssign, BitOrAssign, ControlFlow},
     sync::atomic::{AtomicBool, Ordering::*},
@@ -67,6 +68,7 @@ macro_rules! do_op {
 }
 
 pub static CENTER_NAME: AtomicBool = AtomicBool::new(false);
+pub static FULL_WIDTH_TAB: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Loc {
@@ -150,7 +152,9 @@ impl Side {
     }
 
     pub fn width(&self) -> usize {
-        usize::from(!self.is_empty())
+        let full = FULL_WIDTH_TAB.load(Acquire);
+        let basic = full as usize + 1;
+        usize::from(!self.is_empty()) * basic
     }
 
     pub fn concat(&mut self, parent: &Self) {
@@ -444,14 +448,26 @@ impl<'a> ColLine<'a> {
     }
 
     pub fn max_widths(&self) -> Vec<usize> {
+        let mut skips = BTreeSet::new();
         let mut extendeds = vec![];
         let mut widths: Vec<usize> = (0..self.max_col())
-            .map(|i| self.lines.iter()
-                .map(|line| line.get(i)
+            .map(|col| self.lines.iter()
+                .enumerate()
+                .map(|(i, line)| line.get(col)
                     .map(Option::as_ref)
                     .flatten()
+                    .filter(|_| !skips.contains(&(i, col)))
                     .filter(|elem| if elem.exts != 0 {
-                        extendeds.push((i, elem.exts+1, elem.width()));
+                        let tail = line[col+elem.exts].as_ref().unwrap();
+                        extendeds.push((
+                                col,
+                                elem.exts+1,
+                                elem.width() + tail.width()
+                        ));
+
+                        skips.extend(repeat(i)
+                            .zip(col..)
+                            .take(elem.exts+1));
                         false
                     } else { true })
                     .map_or(0, |elem| elem.width()))
@@ -464,8 +480,7 @@ impl<'a> ColLine<'a> {
             let orig_width = span.iter().copied().sum::<usize>();
             if width <= orig_width { continue }
 
-            // NOTE: 我也不知道为什么要加1, 但是不加显然有严重问题
-            let rem_width = width - orig_width + 1;
+            let rem_width = width - orig_width;
             let point = rem_width % cols;
             let base_width = rem_width / cols;
             for col_width in &mut span[..point] {
