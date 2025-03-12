@@ -126,7 +126,7 @@ impl Side {
             up:     n>>3&1 != 0,
             down:   n>>2&1 != 0,
             left:   n>>1&1 != 0,
-            right:  n>>0&1 != 0,
+            right:  n&1 != 0,
         }
     }
 
@@ -419,6 +419,12 @@ impl<'a> Elem<'a> {
 pub struct ColLine<'a> {
     lines: Vec<Vec<Option<Elem<'a>>>>,
 }
+impl<'a> Default for ColLine<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> ColLine<'a> {
     pub fn new() -> Self {
         Self { lines: vec![vec![]] }
@@ -454,8 +460,7 @@ impl<'a> ColLine<'a> {
             .map(|col| self.lines.iter()
                 .enumerate()
                 .map(|(i, line)| line.get(col)
-                    .map(Option::as_ref)
-                    .flatten()
+                    .and_then(Option::as_ref)
                     .filter(|_| !skips.contains(&(i, col)))
                     .filter(|elem| if elem.exts != 0 {
                         let tail = line[col+elem.exts].as_ref().unwrap();
@@ -470,7 +475,7 @@ impl<'a> ColLine<'a> {
                             .take(elem.exts+1));
                         false
                     } else { true })
-                    .map_or(0, |elem| elem.width()))
+                    .map_or(0, Elem::width))
                 .max()
                 .unwrap_or_default())
             .collect();
@@ -507,8 +512,7 @@ impl<'a> ColLine<'a> {
                 let Some(elem) = elem else { continue };
                 if elem.sides.is_empty()
                 || down.get(i)
-                    .map(Option::as_ref)
-                    .flatten()
+                    .and_then(Option::as_ref)
                     .is_some()
                 { continue }
 
@@ -552,7 +556,7 @@ impl<'a> ColLine<'a> {
                 skips = elem.output(
                     i+1 == max_col,
                     &widths[i..],
-                    tail.unwrap_or_else(|| (&elem)),
+                    tail.unwrap_or(elem),
                 );
             }
             println!();

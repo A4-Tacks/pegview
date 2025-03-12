@@ -1,4 +1,4 @@
-use itermaps::{fields, short_funcs::default};
+use itermaps::fields;
 use std::{
     collections::BTreeSet,
     env::args,
@@ -153,7 +153,6 @@ fn main() {
                         let name = if len == 0 {
                             let attr = Attr {
                                 zero_width: true,
-                                ..default()
                             };
                             Entry::Str(name, attr)
                         } else {
