@@ -375,7 +375,6 @@ impl<'a> Elem<'a> {
     /// result: skip cols
     pub fn output(
         &self,
-        on_tail: bool,
         widths: &[usize],
         tail: &Elem<'a>,
     ) -> usize {
@@ -396,10 +395,6 @@ impl<'a> Elem<'a> {
         }
 
         print!("{}", self.left);
-
-        if on_tail && self.right.is_empty() && rs.is_none() {
-            return self.exts;
-        }
 
         for _ in 0..fillc { print!("{}", self.fill) }
 
@@ -543,7 +538,6 @@ impl<'a> ColLine<'a> {
     }
 
     pub fn output(&self) {
-        let max_col = self.max_col();
         let widths = self.max_widths();
         let fill = Elem::new_fill();
 
@@ -556,7 +550,6 @@ impl<'a> ColLine<'a> {
                 let tail = line[i+elem.exts].as_ref();
                 if tail.is_none() { debug_assert_eq!(elem.exts, 0); }
                 skips = elem.output(
-                    i+1 == max_col,
                     &widths[i..],
                     tail.unwrap_or(elem),
                 );
