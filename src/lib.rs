@@ -204,11 +204,6 @@ impl Sides {
         };
         Self(f(self.0), f(self.1))
     }
-
-    pub fn concat(&mut self, parent: &mut Self) {
-        self.0.concat(&parent.0);
-        self.1.concat(&parent.1);
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -528,13 +523,20 @@ impl<'a> ColLine<'a> {
             .reduce(|up, down|
         {
             // 连接上下线条
+            let mut skips = 0;
             up.iter_mut()
                 .zip(&mut *down)
                 .filter_map(|(up, down)| {
-                    up.as_mut().zip(down.as_mut())
+                    if skips != 0 { skips -= 1; return None; }
+                    let (up, down) = up.as_mut().zip(down.as_mut())?;
+                    skips = down.exts.saturating_sub(1);
+                    Some((up, down))
                 })
                 .for_each(|(up, down)| {
-                    down.sides.concat(&mut up.sides)
+                    down.sides.0.concat(&up.sides.0);
+                    if down.exts == 0 {
+                        down.sides.1.concat(&up.sides.1);
+                    }
                 });
             down
         });
@@ -1000,6 +1002,8 @@ mod tests {
             (1, 1, "a", 0),
             (1, 2, "a", 1),
             (1, 2, "ab", 1),
+            (2, 3, "\nab\n ", 3),
+            (3, 1, "\nab\n ", 4),
         ];
         for (line, col, src, expected) in tests {
             let loc = Loc::new(line, col);
@@ -1033,31 +1037,29 @@ mod tests {
     fn collines_test() {
         let mut colline = ColLine::new();
         colline.push(Elem::new_left('1'), 0, 1, false);
-        colline.push(Elem::new_left('\n'), 1, 1, false);
+        colline.push(Elem::new_left('+'), 1, 1, false);
         colline.push(Elem::new_left('2'), 2, 1, false);
-        colline.push(Elem::new_left(""), 3, 1, false);
-        colline.push(
-            Elem::new_joint("foo", ""),
-            0,
-            1,
-            false,
-        );
+        colline.push(Elem::new_left('+'), 3, 1, false);
+        colline.push(Elem::new_left('3'), 4, 1, false);
+        colline.push(Elem::new_left('+'), 6, 1, false);
+        colline.push(Elem::new_left('4'), 7, 1, false);
+        colline.push(Elem::new_left(""), 5, 1, false);
         colline.push(
             Elem::new_joint("bar", ""),
             0,
-            1,
+            5,
             false,
         );
         colline.push(
             Elem::new_joint("baz", ""),
-            2,
-            2,
+            0,
+            1,
             false,
         );
         colline.push(
             Elem::new_joint("expr", ""),
             0,
-            4,
+            5,
             false,
         );
         colline.fill_hangs();
