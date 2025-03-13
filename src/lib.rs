@@ -673,6 +673,28 @@ where I: IntoIterator<Item = Action<'a>>,
     first
 }
 
+pub fn pair_fails(actions: &mut Vec<Action<'_>>) {
+    let mut attempted = vec![];
+    for action in &mut *actions {
+        match *action {
+            Action::Attempting { name, ref start } => {
+                let start = start.clone();
+                attempted.push(Action::Failed { name, start });
+            },
+            Action::Matched  { name, ref start, .. }
+            | Action::Failed { name, ref start }
+            => {
+                let start = start.clone();
+                let poped = attempted.pop();
+                assert_eq!(poped, Some(Action::Failed { name, start }),
+                           "pair_fails pop attempted no match");
+            },
+            _ => {},
+        }
+    }
+    actions.extend(attempted.into_iter().rev());
+}
+
 pub fn split_regions<'a, I>(iter: I) -> Vec<Vec<Action<'a>>>
 where I: IntoIterator<Item = Action<'a>>,
 {

@@ -26,6 +26,46 @@ fn colline_from_src(src: &str) -> ColLine<'_> {
     colline
 }
 
+fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
+    if regions.len() != 1 || regions.iter()
+        .any(|region| region.iter()
+            .any(|action|
+                action.is_begin() || action.is_end()))
+    {
+        eprintln!("Only support one region \\
+                (no PEG_INPUT_START PEG_INPUT_START PEG_TRACE_STOP)");
+        exit(3);
+    }
+
+    let region = &mut regions[0];
+    let max_col = region.iter()
+        .filter_map(Action::locs)
+        .map(|(start, stop)| stop
+            .filter(|stop| stop.line == 1)
+            .unwrap_or(start))
+        .filter(|loc| loc.line == 1)
+        .map(fields!(column))
+        .max()
+        .unwrap_or(1);
+
+    let mut eof = '$';
+    let Loc { line, column } = region.iter()
+        .filter_map(Action::locs)
+        .map(|(start, stop)| stop.unwrap_or(start))
+        .map(|mut loc| { if loc.line > 1 {
+            eof = '\n';
+            (loc.line, loc.column) = (1, max_col);
+        } loc })
+        .max_by_key(fields!(column))
+        .expect("locations by empty");
+    assert_eq!(line, 1);
+
+    *source = ".".repeat((column-1).cinto());
+    source.push(eof);
+
+    region.push(Action::Begin { source, from: 0 });
+}
+
 fn main() {
     let mut options = getopts::Options::new();
     options
@@ -34,6 +74,7 @@ fn main() {
         .optmulti("I", "ignore-partial", "Ignore a rule, support partial pattern", "NAME")
         .optflag("u", "unique-line", "One rule one line")
         .optflag("e", "exclude-fails", "Exclude failed matches")
+        .optflag("r", "pair-fails", "Add unpaired failed matches")
         .optflag("w", "full-width-tab-chars", "Full-width tab chars")
         .optflag("s", "fake-source", "Using oneline fake source")
         .optflag("q", "unquote-space", "Unquote space")
@@ -66,6 +107,7 @@ fn main() {
 
     let uniq_line = matched.opt_present("u");
     let exclude_fail = matched.opt_present("e");
+    let pair_fail = matched.opt_present("r");
     let mut fake_source = matched.opt_present("s").then(String::new);
     let ignore_set = BTreeSet::from_iter(matched.opt_strs("i"));
     let ignore_part_list = matched.opt_strs("I");
@@ -109,50 +151,23 @@ fn main() {
     };
 
     let mut regions = split_regions(actions);
+
+    if pair_fail {
+        regions.iter_mut()
+            .filter(|region| region.iter()
+                .any(|action| action.is_begin()))
+            .for_each(pair_fails)
+    }
+
     if exclude_fail {
         for actions in &mut regions {
             let new = filter_fails(actions.drain(..));
             actions.extend(new);
         }
     }
+
     if let Some(source) = &mut fake_source {
-        if regions.len() != 1 || regions.iter()
-            .any(|region| region.iter()
-                .any(|action|
-                    action.is_begin() || action.is_end()))
-        {
-            eprintln!("Only support one region \
-                (no PEG_INPUT_START PEG_INPUT_START PEG_TRACE_STOP)");
-            exit(3);
-        }
-
-        let region = &mut regions[0];
-        let max_col = region.iter()
-            .filter_map(Action::locs)
-            .map(|(start, stop)| stop
-                .filter(|stop| stop.line == 1)
-                .unwrap_or(start))
-            .filter(|loc| loc.line == 1)
-            .map(fields!(column))
-            .max()
-            .unwrap_or(1);
-
-        let mut eof = '$';
-        let Loc { line, column } = region.iter()
-            .filter_map(Action::locs)
-            .map(|(start, stop)| stop.unwrap_or(start))
-            .map(|mut loc| { if loc.line > 1 {
-                eof = '\n';
-                (loc.line, loc.column) = (1, max_col);
-            } loc })
-            .max_by_key(fields!(column))
-            .expect("locations by empty");
-        assert_eq!(line, 1);
-
-        *source = ".".repeat((column-1).cinto());
-        source.push(eof);
-
-        region.push(Action::Begin { source, from: 0 });
+        fake_src(&mut regions, source);
     }
 
     for actions in &regions {
@@ -160,7 +175,12 @@ fn main() {
         if let Some((src, from)) = actions.iter().find_map(Action::as_begin) {
             let mut colline = colline_from_src(&src[from..]);
             let tidx = |loc: &Loc| {
-                (loc.to_index(src) - from).cinto::<u32>()
+                let ridx = loc.to_index(src)
+                    .checked_sub(from)
+                    .unwrap_or_else(|| {
+                        panic!("Trace location {loc} less than `from {from}`")
+                    });
+                (ridx).cinto::<u32>()
             };
 
             for action in actions {
