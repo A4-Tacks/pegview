@@ -152,15 +152,15 @@ fn main() {
         *source = ".".repeat((column-1).cinto());
         source.push(eof);
 
-        region.push(Action::Begin { source });
+        region.push(Action::Begin { source, from: 0 });
     }
 
     for actions in &regions {
         println!("----------------------------------------------------------");
-        if let Some(src) = actions.iter().find_map(Action::as_begin) {
-            let mut colline = colline_from_src(src);
+        if let Some((src, from)) = actions.iter().find_map(Action::as_begin) {
+            let mut colline = colline_from_src(&src[from..]);
             let tidx = |loc: &Loc| {
-                loc.to_index(src).cinto::<u32>()
+                (loc.to_index(src) - from).cinto::<u32>()
             };
 
             for action in actions {
@@ -168,9 +168,9 @@ fn main() {
                     Action::Other { text } => {
                         println!("{text}");
                     },
-                    Action::Begin { source } => {
+                    Action::Begin { source, from } => {
                         debug_assert_eq!(src, *source);
-                        println!("Trace Source: {source:?}");
+                        println!("Trace Source: {:?}", &source[*from..]);
                     },
                     _ => (),
                 }

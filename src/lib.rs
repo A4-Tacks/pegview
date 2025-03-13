@@ -740,6 +740,7 @@ pub enum Action<'a> {
     },
     Begin {
         source: &'a str,
+        from: usize,
     },
     End,
     Other {
@@ -814,9 +815,9 @@ impl<'a> Action<'a> {
         matches!(self, Self::Other { .. })
     }
 
-    pub fn as_begin(&self) -> Option<&'a str> {
-        if let Self::Begin { source } = self {
-            Some(source)
+    pub fn as_begin(&self) -> Option<(&'a str, usize)> {
+        if let Self::Begin { source, from } = self {
+            Some((source, *from))
         } else {
             None
         }
@@ -874,11 +875,11 @@ peg::parser!(pub grammar parser() for str {
     rule content() -> Action<'input>
         = "[PEG_TRACE]" _ t:peg_trace()
             { t }
-        / "[PEG_INPUT_START]" nl()
+        / "[PEG_INPUT_START]" from:(_? "from" _ n:num() {n})? nl()
             source:$( (!"[PEG_TRACE_START]" [^'\r' | '\n']*)**nl() )
             nl()?
             "[PEG_TRACE_START]"
-            { Action::Begin { source } }
+            { Action::Begin { source, from: from.unwrap_or_default().cinto() } }
         / "[PEG_TRACE_STOP]"
             { Action::End }
         / !("[PEG_TRACE]" / "[PEG_INPUT_START]" / "[PEG_TRACE_STOP]" / ![_])
@@ -919,8 +920,11 @@ impl<'a> Display for Action<'a> {
                 write!(f, "[PEG_TRACE] ")?;
                 write!(f, "Leaving level {level}")
             },
-            Action::Begin { source } => {
+            Action::Begin { source, from: 0 } => {
                 write!(f, "[PEG_INPUT_START]\n{source}\n[PEG_TRACE_START]")
+            },
+            Action::Begin { source, from } => {
+                write!(f, "[PEG_INPUT_START] from {from}\n{source}\n[PEG_TRACE_START]")
             },
             Action::End => {
                 write!(f, "[PEG_TRACE_STOP]")

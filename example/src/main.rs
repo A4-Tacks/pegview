@@ -30,20 +30,23 @@ peg::parser!(grammar p() for str {
             once(a).chain(b).reduce(ops::Add::add).unwrap()
         }
     rule trace<T>(r: rule<T>) -> T
-        = &(start:position!() src:$([_]*) {
-            assert_eq!(start, 0, "only support trace from source start");
-            #[cfg(feature = "trace")]
-            println!("[PEG_INPUT_START]\n{src}\n[PEG_TRACE_START]");
-        })
+        = #{|input, pos| {
+            #[cfg(feature = "trace")] {
+                print!("[PEG_INPUT_START]");
+                if pos != 0 { print!(" from {pos}") }
+                println!("\n{input}\n[PEG_TRACE_START]");
+            }
+            peg::RuleResult::Matched(pos, ())
+        }}
         r:r()? {?
             #[cfg(feature = "trace")]
             println!("[PEG_TRACE_STOP]");
             r.ok_or("")
         }
     pub rule top_level() -> f64
-        = trace(<expr()>)
+        = "> " r:trace(<expr()>) {r}
 });
 
 fn main() {
-    let _ = dbg!(p::top_level("1*(2+3)+4*5^6"));
+    println!("Result: {:?}", p::top_level("> 1*(2+3)+4*5^6"));
 }
