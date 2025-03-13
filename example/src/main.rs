@@ -31,6 +31,7 @@ peg::parser!(grammar p() for str {
         }
     rule trace<T>(r: rule<T>) -> T
         = #{|input, pos| {
+            // PEG 0.8.5 feature #{|input, pos| ...}
             #[cfg(feature = "trace")] {
                 print!("[PEG_INPUT_START]");
                 if pos != 0 { print!(" from {pos}") }
