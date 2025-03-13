@@ -6,6 +6,7 @@ Tree visualization of [rust-peg] trace
 [rust-peg]: https://github.com/kevinmehall/rust-peg/
 
 # Features
+- [x] Local trace
 - [x] Matched and Failed
 - [x] Exclude failed rules
 - [x] Zero width matched view
