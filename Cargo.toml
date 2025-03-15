@@ -9,6 +9,7 @@ description = "Tree visualization of rust-peg trace"
 
 [dependencies]
 getopts = "0.2.21"
+getopts-macro = "0.1.0"
 itermaps = "0.3.3"
 line-column = "0.1.2"
 peg = "0.8.5"

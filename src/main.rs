@@ -69,22 +69,22 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
 }
 
 fn main() {
-    let mut options = getopts::Options::new();
-    options
-        .optflag("c", "center-rule", "Rule name to centered")
-        .optmulti("i", "ignore", "Ignore a rule", "NAME")
-        .optmulti("I", "ignore-partial", "Ignore a rule, support partial pattern", "NAME")
-        .optflag("u", "unique-line", "One rule one line")
-        .optflag("e", "exclude-fails", "Exclude failed matches")
-        .optflag("r", "pair-fails", "Add unpaired failed matches")
-        .optflag("w", "full-width-tab-chars", "Full-width tab chars")
-        .optflag("s", "fake-source", "Using oneline fake source")
-        .optopt("S", "fake-source-from", "Using oneline fake source", "SRC")
-        .optflag("q", "unquote-space", "Unquote space")
-        .optflag("C", "show-cached", "Show cached match and fail")
-        .optflag("h", "help", "Show help messages")
-        .optflag("v", "version", "Show version")
-        .parsing_style(getopts::ParsingStyle::FloatingFrees);
+    let options = getopts_macro::getopts_options! {
+        -c --center-rule            "Rule name to centered";
+        -i --ignore*=NAME           "Ignore a rule";
+        -I --ignore-partial*=NAME   "Ignore a rule, support partial pattern";
+        -u --unique-line            "One rule one line";
+        -e --exclude-fails          "Exclude failed matches";
+        -r --pair-fails             "Add unpaired failed matches";
+        -w --full-width-tab-chars   "Full-width tab chars";
+        -s --fake-source            "Using oneline fake source";
+        -S --fake-source-from=SRC   "Using oneline fake source";
+        -q --unquote-space          "Unquote space";
+        -C --show-cached            "Show cached match and fail";
+        -h --help*                  "Show help messages";
+        -v --version                "Show version";
+        .parsing_style(getopts::ParsingStyle::FloatingFrees)
+    };
 
     let result = options.parse(args().skip(1));
     let matched = match result {

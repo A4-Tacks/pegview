@@ -12,6 +12,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "getopts-macro"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57b696abf92c9de21651195a8305c4af00ad158760552b9e072cf50c3274ac44"
+dependencies = [
+ "getopts",
+]
+
+[[package]]
 name = "itermaps"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -55,6 +64,7 @@ name = "pegview"
 version = "0.2.3"
 dependencies = [
  "getopts",
+ "getopts-macro",
  "itermaps",
  "line-column",
  "peg",
