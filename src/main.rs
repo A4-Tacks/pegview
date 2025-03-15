@@ -32,7 +32,7 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
             .any(|action|
                 action.is_begin() || action.is_end()))
     {
-        eprintln!("Only support one region \\
+        eprintln!("Only support one region \
                 (no PEG_INPUT_START PEG_INPUT_START PEG_TRACE_STOP)");
         exit(3);
     }
@@ -60,7 +60,9 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
         .expect("locations by empty");
     assert_eq!(line, 1);
 
-    *source = ".".repeat((column-1).cinto());
+    for _ in source.len()..(column-1).cinto() {
+        source.push('.')
+    }
     source.push(eof);
 
     region.push(Action::Begin { source, from: 0 });
@@ -77,6 +79,7 @@ fn main() {
         .optflag("r", "pair-fails", "Add unpaired failed matches")
         .optflag("w", "full-width-tab-chars", "Full-width tab chars")
         .optflag("s", "fake-source", "Using oneline fake source")
+        .optopt("S", "fake-source-from", "Using oneline fake source", "SRC")
         .optflag("q", "unquote-space", "Unquote space")
         .optflag("C", "show-cached", "Show cached match and fail")
         .optflag("h", "help", "Show help messages")
@@ -108,7 +111,8 @@ fn main() {
     let uniq_line = matched.opt_present("u");
     let exclude_fail = matched.opt_present("e");
     let pair_fail = matched.opt_present("r");
-    let mut fake_source = matched.opt_present("s").then(String::new);
+    let mut fake_source = matched.opt_str("S")
+        .or_else(|| matched.opt_present("s").then(String::new));
     let ignore_set = BTreeSet::from_iter(matched.opt_strs("i"));
     let ignore_part_list = matched.opt_strs("I");
     let show_cached = matched.opt_present("C");
