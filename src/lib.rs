@@ -532,13 +532,16 @@ impl<'a> ColLine<'a> {
                 .zip(&mut *down)
                 .filter_map(|(up, down)| {
                     if skips != 0 { skips -= 1; return None; }
-                    let (up, down) = up.as_mut().zip(down.as_mut())?;
+                    let down = down.as_mut()?;
                     skips = down.exts.saturating_sub(1);
+                    let up = up.as_mut()?;
                     Some((up, down))
                 })
                 .for_each(|(up, down)| {
-                    down.sides.0.concat(&up.sides.0);
-                    if down.exts == 0 {
+                    if down.sides.0.down {
+                        down.sides.0.concat(&up.sides.0);
+                    }
+                    if down.sides.1.down && down.exts == 0 {
                         down.sides.1.concat(&up.sides.1);
                     }
                 });
@@ -1075,21 +1078,15 @@ mod tests {
         colline.push(Elem::new_left('4'), 7, 1, false);
         colline.push(Elem::new_left(""), 5, 1, false);
         colline.push(
-            Elem::new_joint("bar", ""),
-            0,
-            5,
-            false,
-        );
-        colline.push(
             Elem::new_joint("baz", ""),
             0,
-            1,
+            3,
             false,
         );
         colline.push(
-            Elem::new_joint("expr", ""),
-            0,
-            5,
+            Elem::new_joint("exp", ""),
+            2,
+            1,
             false,
         );
         colline.fill_hangs();
