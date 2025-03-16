@@ -60,7 +60,7 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
         .expect("locations by empty");
     assert_eq!(line, 1);
 
-    for _ in source.len()..(column-1).cinto() {
+    for _ in source.chars().count()..(column-1).cinto() {
         source.push('.')
     }
     source.push(eof);
@@ -179,12 +179,12 @@ fn main() {
         if let Some((src, from)) = actions.iter().find_map(Action::as_begin) {
             let mut colline = colline_from_src(&src[from..]);
             let tidx = |loc: &Loc| {
-                let ridx = loc.to_index(src)
+                let ridx = loc.to_char_index(src)
                     .checked_sub(from)
                     .unwrap_or_else(|| {
                         panic!("Trace location {loc} less than `from {from}`")
                     });
-                (ridx).cinto::<u32>()
+                ridx.cinto::<u32>()
             };
 
             for action in actions {

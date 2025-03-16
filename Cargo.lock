@@ -28,9 +28,9 @@ checksum = "95e4eb9bdef6ff7ef5321b6bff6b42a9500e79ac07cc446de9bb36c19ae6ce82"
 
 [[package]]
 name = "line-column"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4cf44c7db35d12f5e8949572595c29572dc56c624df3fdc8df88d1a3112cfe6"
+checksum = "b5f2db24abccca8b7cc165976015cadd40be73bc20413352340d2567e80dc251"
 
 [[package]]
 name = "peg"
@@ -61,7 +61,7 @@ checksum = "132dca9b868d927b35b5dd728167b2dee150eb1ad686008fc71ccb298b776fca"
 
 [[package]]
 name = "pegview"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "getopts",
  "getopts-macro",

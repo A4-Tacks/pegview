@@ -89,8 +89,8 @@ impl Loc {
     }
 
     #[track_caller]
-    pub fn to_index(&self, src: &str) -> usize {
-        line_column::index(src, self.line, self.column)
+    pub fn to_char_index(&self, src: &str) -> usize {
+        line_column::char_index(src, self.line, self.column)
     }
 }
 
@@ -1040,7 +1040,7 @@ mod tests {
         ];
         for (line, col, src, expected) in tests {
             let loc = Loc::new(line, col);
-            assert_eq!(loc.to_index(src), expected);
+            assert_eq!(loc.to_char_index(src), expected);
         }
     }
 
