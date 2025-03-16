@@ -541,7 +541,7 @@ impl<'a> ColLine<'a> {
                     if down.sides.0.down {
                         down.sides.0.concat(&up.sides.0);
                     }
-                    if down.sides.1.down && down.exts == 0 {
+                    if up.exts == 0 && down.exts == 0 {
                         down.sides.1.concat(&up.sides.1);
                     }
                 });
@@ -1078,14 +1078,19 @@ mod tests {
         colline.push(Elem::new_left('4'), 7, 1, false);
         colline.push(Elem::new_left(""), 5, 1, false);
         colline.push(
-            Elem::new_joint("baz", ""),
+            Elem::new(
+                "baz",
+                " ",
+                Sides::bit_new(0b0101_0000),
+                ' ',
+            ),
             0,
-            3,
+            1,
             false,
         );
         colline.push(
             Elem::new_joint("exp", ""),
-            2,
+            0,
             1,
             false,
         );
