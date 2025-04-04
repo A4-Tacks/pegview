@@ -36,14 +36,13 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
                 (no PEG_INPUT_START PEG_INPUT_START PEG_TRACE_STOP)");
         exit(3);
     }
-
     let region = &mut regions[0];
     let max_col = region.iter()
         .filter_map(Action::locs)
         .map(|(start, stop)| stop
-            .filter(|stop| stop.line == 1)
+            .filter(|stop| stop.line <= 1)
             .unwrap_or(start))
-        .filter(|loc| loc.line == 1)
+        .filter(|loc| loc.line <= 1)
         .map(fields!(column))
         .max()
         .unwrap_or(1);
@@ -52,13 +51,16 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
     let Loc { line, column } = region.iter()
         .filter_map(Action::locs)
         .map(|(start, stop)| stop.unwrap_or(start))
-        .map(|mut loc| { if loc.line > 1 {
-            eof = '\n';
-            (loc.line, loc.column) = (1, max_col);
-        } loc })
+        .map(|mut loc| {
+            if loc.line > 1 {
+                eof = '\n';
+                (loc.line, loc.column) = (1, max_col);
+            }
+            loc
+        })
         .max_by_key(fields!(column))
         .expect("locations by empty");
-    assert_eq!(line, 1);
+    assert!(line <= 1, "{line}");
 
     for _ in source.chars().count()..(column-1).cinto() {
         source.push('.')
@@ -179,7 +181,7 @@ fn main() {
         if let Some((src, from)) = actions.iter().find_map(Action::as_begin) {
             let mut colline = colline_from_src(&src[from..]);
             let tidx = |loc: &Loc| {
-                let ridx = loc.to_char_index(src)
+                let ridx = loc.get_char_index(src)
                     .checked_sub(from)
                     .unwrap_or_else(|| {
                         panic!("Trace location {loc} less than `from {from}`")

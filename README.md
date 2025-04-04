@@ -12,4 +12,5 @@ Tree visualization of [rust-peg] trace
 - [x] Zero width matched view
 - [x] Full-width tab characters
 - [x] Cached trace
+- [x] Char index location `1:4` -> `#3`
 - [ ] Precedence levels

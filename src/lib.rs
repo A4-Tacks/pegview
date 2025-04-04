@@ -73,6 +73,7 @@ pub static UNQUOTE_SPACE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Loc {
+    /// by zero is index mode
     pub line: u32,
     pub column: u32,
 }
@@ -88,9 +89,31 @@ impl Loc {
         Self { line, column }
     }
 
+    /// New char index location
+    pub fn new_index(index: u32) -> Self {
+        Self { line: 0, column: index }
+    }
+
     #[track_caller]
-    pub fn to_char_index(&self, src: &str) -> usize {
+    pub fn get_char_index(&self, src: &str) -> usize {
+        if self.line == 0 {
+            return self.column.cinto();
+        }
         line_column::char_index(src, self.line, self.column)
+    }
+
+    #[track_caller]
+    pub fn to_char_index(&mut self, src: &str) {
+        self.column = self.get_char_index(src).cinto();
+        self.line = 0;
+    }
+
+    pub fn oneline_col(&self) -> Option<u32> {
+        match self.line {
+            0 => Some(self.column+1),
+            1 => Some(self.column),
+            _ => None,
+        }
     }
 }
 
@@ -275,7 +298,7 @@ impl<'a> Entry<'a> {
         matches!(self, Self::Str(..))
     }
 }
-impl<'a> Display for Entry<'a> {
+impl Display for Entry<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Entry::Str(s, attr) => write!(f, "{s}{attr}"),
@@ -283,17 +306,17 @@ impl<'a> Display for Entry<'a> {
         }
     }
 }
-impl<'a> Default for Entry<'a> {
+impl Default for Entry<'_> {
     fn default() -> Self {
         Self::Str("", default())
     }
 }
-impl<'a> From<char> for Entry<'a> {
+impl From<char> for Entry<'_> {
     fn from(v: char) -> Self {
         Self::Char(v.into())
     }
 }
-impl<'a> From<DChar> for Entry<'a> {
+impl From<DChar> for Entry<'_> {
     fn from(v: DChar) -> Self {
         Self::Char(v)
     }
@@ -418,7 +441,7 @@ impl<'a> Elem<'a> {
 pub struct ColLine<'a> {
     lines: Vec<Vec<Option<Elem<'a>>>>,
 }
-impl<'a> Default for ColLine<'a> {
+impl Default for ColLine<'_> {
     fn default() -> Self {
         Self::new()
     }
@@ -609,7 +632,7 @@ impl Display for DChar {
 }
 
 pub struct Repeat<'a>(pub &'a str, pub u32);
-impl<'a> Display for Repeat<'a> {
+impl Display for Repeat<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for _ in 0..self.1 {
             f.write_str(self.0)?;
@@ -859,8 +882,8 @@ peg::parser!(pub grammar parser() for str {
         = "`" s:$((!_ [^'`' | '\r' | '\n'])+) "`" { s }
         / $([^'`' | ' ' | '\t' | '\r' | '\n']+)
     rule loc() -> Loc
-        = line:num() ":" column:num()
-        { Loc { line, column } }
+        = "#" index:num()               { Loc::new_index(index) }
+        / line:num() ":" column:num()   { Loc { line, column } }
 
     rule peg_trace() -> Action<'input>
         = "Attempting to match rule"
@@ -914,7 +937,7 @@ peg::parser!(pub grammar parser() for str {
     rule lines() -> Vec<Action<'input>>
         = x:content()**nl() nl()? {x}
 });
-impl<'a> Display for Action<'a> {
+impl Display for Action<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Action::Attempting { name, start } => {
@@ -1040,7 +1063,7 @@ mod tests {
         ];
         for (line, col, src, expected) in tests {
             let loc = Loc::new(line, col);
-            assert_eq!(loc.to_char_index(src), expected);
+            assert_eq!(loc.get_char_index(src), expected);
         }
     }
 
