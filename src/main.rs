@@ -37,8 +37,18 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
         exit(3);
     }
     let region = &mut regions[0];
-    let max_col = region.iter()
+    let compat_locs = region.iter()
         .filter_map(Action::locs)
+        .map(|(start, stop)| {
+            let f = |mut loc: Loc| {
+                if loc.line == 0 {
+                    loc.column += 1;
+                }
+                loc
+            };
+            (f(start), stop.map(f))
+        });
+    let max_col = compat_locs.clone()
         .map(|(start, stop)| stop
             .filter(|stop| stop.line <= 1)
             .unwrap_or(start))
@@ -48,8 +58,7 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
         .unwrap_or(1);
 
     let mut eof = '$';
-    let Loc { line, column } = region.iter()
-        .filter_map(Action::locs)
+    let Loc { line, column } = compat_locs
         .map(|(start, stop)| stop.unwrap_or(start))
         .map(|mut loc| {
             if loc.line > 1 {
