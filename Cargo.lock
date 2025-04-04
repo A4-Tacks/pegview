@@ -13,9 +13,9 @@ dependencies = [
 
 [[package]]
 name = "getopts-macro"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57b696abf92c9de21651195a8305c4af00ad158760552b9e072cf50c3274ac44"
+checksum = "5d39bc1891758f5dceaff53f61ba4f065301533c915a2e3bfba076dd0435090f"
 dependencies = [
  "getopts",
 ]
@@ -61,7 +61,7 @@ checksum = "132dca9b868d927b35b5dd728167b2dee150eb1ad686008fc71ccb298b776fca"
 
 [[package]]
 name = "pegview"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "getopts",
  "getopts-macro",

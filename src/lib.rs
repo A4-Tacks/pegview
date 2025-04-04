@@ -77,9 +77,18 @@ pub struct Loc {
     pub line: u32,
     pub column: u32,
 }
+impl Default for Loc {
+    fn default() -> Self {
+        Self::new(1, 1)
+    }
+}
 impl Display for Loc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.line, self.column)
+        if self.line == 0 {
+            write!(f, "#{}", self.column)
+        } else {
+            write!(f, "{}:{}", self.line, self.column)
+        }
     }
 }
 impl Loc {
@@ -87,6 +96,12 @@ impl Loc {
         assert_ne!(line, 0);
         assert_ne!(column, 0);
         Self { line, column }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        matches!(self,
+            | Self { line: 0, column: 0 }
+            | Self { line: 1, column: 1 })
     }
 
     /// New char index location
@@ -788,7 +803,7 @@ pub enum Action<'a> {
     },
     Begin {
         source: &'a str,
-        from: usize,
+        from: Loc,
     },
     End,
     Other {
@@ -863,9 +878,9 @@ impl<'a> Action<'a> {
         matches!(self, Self::Other { .. })
     }
 
-    pub fn as_begin(&self) -> Option<(&'a str, usize)> {
+    pub fn as_begin(&self) -> Option<(&'a str, &Loc)> {
         if let Self::Begin { source, from } = self {
-            Some((source, *from))
+            Some((source, from))
         } else {
             None
         }
@@ -923,11 +938,13 @@ peg::parser!(pub grammar parser() for str {
     rule content() -> Action<'input>
         = "[PEG_TRACE]" _ t:peg_trace()
             { t }
-        / "[PEG_INPUT_START]" from:(_? "from" _ n:num() {n})? nl()
+        / "[PEG_INPUT_START]" from:(_? "from" _
+                n:(loc() / n:num() {Loc::new_index(n)}) {n}
+            )? nl()
             source:$( (!"[PEG_TRACE_START]" [^'\r' | '\n']*)**nl() )
             nl()?
             "[PEG_TRACE_START]"
-            { Action::Begin { source, from: from.unwrap_or_default().cinto() } }
+            { Action::Begin { source, from: from.unwrap_or_default() } }
         / "[PEG_TRACE_STOP]"
             { Action::End }
         / !("[PEG_TRACE]" / "[PEG_INPUT_START]" / "[PEG_TRACE_STOP]" / ![_])
@@ -968,7 +985,7 @@ impl Display for Action<'_> {
                 write!(f, "[PEG_TRACE] ")?;
                 write!(f, "Leaving level {level}")
             },
-            Action::Begin { source, from: 0 } => {
+            Action::Begin { source, from } if from.is_zero()  => {
                 write!(f, "[PEG_INPUT_START]\n{source}\n[PEG_TRACE_START]")
             },
             Action::Begin { source, from } => {

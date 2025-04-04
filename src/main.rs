@@ -9,6 +9,41 @@ use std::{
 };
 
 const BINNAME: &str = env!("CARGO_BIN_NAME");
+const EXAMPLE_MSG: &str =
+{r#"Grammar:
+    add    = atom *("+" atom)
+    atom   = number
+           / "(" add ")"
+    number = ;builtin-token;
+
+Location:
+    <num>:<num>         Line and column number, based 1, e.g 1:1
+    #<num>              Char index, based 0, e.g #0
+
+Let your parser output the following trace format:
+
+$ pegview <<\EOF
+[PEG_INPUT_START]
+(1+2)
+[PEG_TRACE_START]
+[PEG_TRACE] Attempting to match rule `add` at 1:1
+[PEG_TRACE] Attempting to match rule `atom` at 1:1
+[PEG_TRACE] Attempting to match rule `number` at 1:1
+[PEG_TRACE] Failed to match rule `number` at 1:1
+[PEG_TRACE] Attempting to match rule `add` at 1:2
+[PEG_TRACE] Attempting to match rule `atom` at 1:2
+[PEG_TRACE] Attempting to match rule `number` at 1:2
+[PEG_TRACE] Matched rule `number` at 1:2 to 1:3
+[PEG_TRACE] Matched rule `atom` at 1:2 to 1:3
+[PEG_TRACE] Attempting to match rule `add` at 1:4
+[PEG_TRACE] Attempting to match rule `atom` at 1:4
+[PEG_TRACE] Matched rule `number` at 1:4 to 1:5
+[PEG_TRACE] Matched rule `atom` at 1:4 to 1:5
+[PEG_TRACE] Matched rule `add` at 1:2 to 1:5
+[PEG_TRACE] Matched rule `atom` at 1:1 to 1:6
+[PEG_TRACE] Matched rule `add` at 1:1 to 1:6
+[PEG_TRACE_STOP]
+EOF"#};
 
 use pegview::*;
 
@@ -76,7 +111,7 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
     }
     source.push(eof);
 
-    region.push(Action::Begin { source, from: 0 });
+    region.push(Action::Begin { source, from: default() });
 }
 
 fn main() {
@@ -93,6 +128,7 @@ fn main() {
         -q --unquote-space          "Unquote space";
         -C --show-cached            "Show cached match and fail";
         -h --help*                  "Show help messages";
+           --example                "Show example usage";
         -v --version                "Show version";
         .parsing_style(getopts::ParsingStyle::FloatingFrees)
     };
@@ -112,6 +148,10 @@ fn main() {
         let usage = options.usage(&info);
         println!("{usage}");
         println!("Report bugs from {} issues", env!("CARGO_PKG_REPOSITORY"));
+        exit(0)
+    }
+    if matched.opt_present("example") {
+        println!("{}", EXAMPLE_MSG);
         exit(0)
     }
     if matched.opt_present("v") {
@@ -188,6 +228,7 @@ fn main() {
     for actions in &regions {
         println!("----------------------------------------------------------");
         if let Some((src, from)) = actions.iter().find_map(Action::as_begin) {
+            let from = from.get_char_index(src);
             let mut colline = colline_from_src(&src[from..]);
             let tidx = |loc: &Loc| {
                 let ridx = loc.get_char_index(src)
@@ -198,14 +239,16 @@ fn main() {
                 ridx.cinto::<u32>()
             };
 
+            println!("Trace Source: {:?}", &src[from..]);
+
             for action in actions {
                 match action {
                     Action::Other { text } => {
                         println!("{text}");
                     },
-                    Action::Begin { source, from } => {
-                        debug_assert_eq!(src, *source);
-                        println!("Trace Source: {:?}", &source[*from..]);
+                    Action::Begin { source, from: _ } => {
+                        debug_assert_eq!(src, *source,
+                                        "Possible duplicate [PEG_INPUT_START]");
                     },
                     _ => (),
                 }
