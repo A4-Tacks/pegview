@@ -42,6 +42,7 @@ jobs:
           # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
           # Note that glob pattern is not supported yet.
           bin: pegview
+          archive: $bin-$tag-$target
           # (optional) Target triple, default is host triple.
           target: ${{ matrix.target }}
           checksum: sha256
