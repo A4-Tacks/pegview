@@ -8,6 +8,8 @@ use std::{
     sync::atomic::Ordering,
 };
 
+use pegview::*;
+
 const BINNAME: &str = env!("CARGO_BIN_NAME");
 const EXAMPLE_MSG: &str =
 {r#"Grammar:
@@ -45,19 +47,17 @@ $ pegview <<\EOF
 [PEG_TRACE_STOP]
 EOF"#};
 
-use pegview::*;
-
-fn colline_from_src(src: &str) -> ColLine<'_> {
-    let mut colline = ColLine::new();
+fn colline_from_src(src: &str, cfg: Config) -> ColLine<'_> {
+    let mut colline = ColLine::new(cfg);
     let mut i = 0;
     for ch in src.chars() {
         let elem = Elem::new_left(ch);
-        colline.push(elem, i, 1, false);
+        colline.push(elem, i, 1);
         i += 1;
     }
     // 填充末尾, 防止末尾匹配下降过头
     let elem = Elem::new_fill();
-    colline.push(elem, i, 1, false);
+    colline.push(elem, i, 1);
     colline
 }
 
@@ -120,6 +120,8 @@ fn main() {
         -i --ignore*=NAME           "Ignore a rule";
         -I --ignore-partial*=NAME   "Ignore a rule, support partial pattern";
         -u --unique-line            "One rule one line";
+        -L --last-width             "Share width to last";
+           --share-width=STYLE      "Share width style (mixed, first, last)";
         -e --exclude-fails          "Exclude failed matches";
         -r --pair-fails             "Add unpaired failed matches";
         -w --full-width-tab-chars   "Full-width tab chars";
@@ -167,6 +169,14 @@ fn main() {
     let ignore_set = BTreeSet::from_iter(matched.opt_strs("i"));
     let ignore_part_list = matched.opt_strs("I");
     let show_cached = matched.opt_present("C");
+    let share_width_style = matched
+        .opt_get_default("share-width", matched.opt_present("L")
+            .then_some(ShareWidth::Last)
+            .unwrap_or_default())
+        .unwrap_or_else(|e| {
+            eprintln!("error: {e}");
+            exit(2)
+        });
 
     CENTER_NAME.store(matched.opt_present("c"), Ordering::Release);
     FULL_WIDTH_TAB.store(matched.opt_present("w"), Ordering::Release);
@@ -221,6 +231,11 @@ fn main() {
         }
     }
 
+    let cfg = Config {
+        uniq: uniq_line,
+        share_width: share_width_style,
+    };
+
     if let Some(source) = &mut fake_source {
         fake_src(&mut regions, source);
     }
@@ -229,7 +244,7 @@ fn main() {
         println!("----------------------------------------------------------");
         if let Some((src, from)) = actions.iter().find_map(Action::as_begin) {
             let from = from.get_char_index(src);
-            let mut colline = colline_from_src(&src[from..]);
+            let mut colline = colline_from_src(&src[from..], cfg.clone());
             let tidx = |loc: &Loc| {
                 let ridx = loc.get_char_index(src)
                     .checked_sub(from)
@@ -271,7 +286,7 @@ fn main() {
                         };
                         let cols = len.max(1);
                         let elem = Elem::new_joint(name, "");
-                        colline.push(elem, start, cols, uniq_line);
+                        colline.push(elem, start, cols);
                     },
                     Action::Failed { name, start } => {
                         if ignored(*name) { continue; }
@@ -282,7 +297,7 @@ fn main() {
                             Sides::bit_new(0b0101_0000),
                             ' ',
                         );
-                        colline.push(elem, start, 1, uniq_line);
+                        colline.push(elem, start, 1);
                     },
                     Action::CachedMatch { name, start } if show_cached => {
                         if ignored(*name) { continue; }
@@ -296,7 +311,7 @@ fn main() {
                             Sides::bit_new(0b0101_0000),
                             ' ',
                         );
-                        colline.push(elem, start, 1, uniq_line);
+                        colline.push(elem, start, 1);
                     },
                     Action::CachedFail { name, start } if show_cached => {
                         if ignored(*name) { continue; }
@@ -310,7 +325,7 @@ fn main() {
                             Sides::bit_new(0b0101_0000),
                             ' ',
                         );
-                        colline.push(elem, start, 1, uniq_line);
+                        colline.push(elem, start, 1);
                     },
                     _ => (),
                 }

@@ -4,6 +4,7 @@ use std::{
     iter::{once, repeat, repeat_n},
     mem::take,
     ops::{BitAndAssign, BitOrAssign, ControlFlow},
+    str::FromStr,
     sync::atomic::{AtomicBool, Ordering::*},
 };
 
@@ -424,7 +425,14 @@ impl<'a> Elem<'a> {
         &self,
         widths: &[usize],
         tail: &Elem<'a>,
+        share_width: &ShareWidth,
     ) -> usize {
+        fn center_prefix(fill: char, fillc: &mut usize) {
+            let pre_fillc = *fillc >> 1;
+            *fillc -= pre_fillc;
+            for _ in 0..pre_fillc { print!("{}", fill) }
+        }
+
         let col_width = widths[..=self.exts].iter().sum::<usize>();
         let mut fillc = col_width - self.width();
         let (ls, _) = self.sides.sides();
@@ -432,13 +440,21 @@ impl<'a> Elem<'a> {
         if self.exts != 0 { fillc -= tail.width() }
 
         if let Some(ls) = ls { print!("{ls}") }
-        if self.right.is_empty() && (
-            self.left.is_char() || CENTER_NAME.load(Acquire)
-        ) {
-            // one side output, center mode
-            let pre_fillc = fillc >> 1;
-            fillc -= pre_fillc;
-            for _ in 0..pre_fillc { print!("{}", self.fill) }
+        if self.right.is_empty() {
+            if self.left.is_char() {
+                // src mode
+                match share_width {
+                    ShareWidth::Mixed => center_prefix(self.fill, &mut fillc),
+                    ShareWidth::First => {
+                        for _ in 0..fillc { print!("{}", self.fill) }
+                        fillc = 0;
+                    },
+                    ShareWidth::Last => (),
+                }
+            } else if CENTER_NAME.load(Acquire) {
+                // one side output, center mode
+                center_prefix(self.fill, &mut fillc);
+            }
         }
 
         print!("{}", self.left);
@@ -452,22 +468,100 @@ impl<'a> Elem<'a> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub enum ShareWidth {
+    Mixed,
+    First,
+    Last,
+}
+impl Default for ShareWidth {
+    fn default() -> Self {
+        Self::Mixed
+    }
+}
+impl FromStr for ShareWidth {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "mixed" => Ok(Self::Mixed),
+            "first" => Ok(Self::First),
+            "last" => Ok(Self::Last),
+            e => Err(format!("invalid share width style: {e:?}")),
+        }
+    }
+}
+impl ShareWidth {
+    fn run_mixed(span: &mut [usize], rem_width: usize) {
+        // 较为均匀的将可扩展元素的长度匀入多列中
+        let cols = span.len();
+        let point = rem_width % cols;
+        let base_width = rem_width / cols;
+        for col_width in &mut span[..point] {
+            *col_width += base_width+1;
+        }
+        for col_width in &mut span[point..] {
+            *col_width += base_width;
+        }
+    }
+
+    fn run_first(span: &mut [usize], rem_width: usize) {
+        span[0] += rem_width;
+    }
+
+    fn run_last(span: &mut [usize], rem_width: usize) {
+        *span.last_mut().unwrap() += rem_width;
+    }
+
+    /// extendeds: `&[(i, cols, width)]`
+    fn run(&self,
+        widths: &mut Vec<usize>,
+        extendeds: &[(usize, usize, usize)],
+    ) {
+        for &(i, cols, width) in extendeds {
+            let span = &mut widths[i..][..cols];
+            let orig_width = span.iter().sum::<usize>();
+            if width <= orig_width { continue }
+            let rem_width = width - orig_width;
+
+            assert_eq!(span.len(), cols);
+            debug_assert_ne!(cols, 0);
+
+            match self {
+                ShareWidth::Mixed => Self::run_mixed(span, rem_width),
+                ShareWidth::First => Self::run_first(span, rem_width),
+                ShareWidth::Last => Self::run_last(span, rem_width),
+            }
+        }
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub struct Config {
+    pub uniq: bool,
+    pub share_width: ShareWidth,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ColLine<'a> {
     lines: Vec<Vec<Option<Elem<'a>>>>,
+    cfg: Config,
 }
 impl Default for ColLine<'_> {
     fn default() -> Self {
-        Self::new()
+        Self::new(default())
     }
 }
 
 impl<'a> ColLine<'a> {
-    pub fn new() -> Self {
-        Self { lines: vec![vec![]] }
+    pub fn new(cfg: Config) -> Self {
+        Self {
+            lines: vec![vec![]],
+            cfg,
+        }
     }
 
-    pub fn push(&mut self, elem: Elem<'a>, coli: u32, cols: u32, uniq: bool) {
+    pub fn push(&mut self, elem: Elem<'a>, coli: u32, cols: u32) {
         assert_ne!(cols, 0);
         let coli = coli.cinto::<usize>();
         let cols = cols.cinto::<usize>();
@@ -481,7 +575,7 @@ impl<'a> ColLine<'a> {
             .find_last(|line|
         {
             line.is_empty()
-                || !uniq
+                || !self.cfg.uniq
                 && line.iter().skip(coli).take(cols).all(Option::is_none)
         }).unwrap();
         line.assign_able(end-1);
@@ -516,22 +610,7 @@ impl<'a> ColLine<'a> {
                 .max()
                 .unwrap_or_default())
             .collect();
-        for (i, cols, width) in extendeds {
-            // 较为均匀的将可扩展元素的长度匀入多列中
-            let span = &mut widths[i..][..cols];
-            let orig_width = span.iter().copied().sum::<usize>();
-            if width <= orig_width { continue }
-
-            let rem_width = width - orig_width;
-            let point = rem_width % cols;
-            let base_width = rem_width / cols;
-            for col_width in &mut span[..point] {
-                *col_width += base_width+1;
-            }
-            for col_width in &mut span[point..] {
-                *col_width += base_width;
-            }
-        }
+        self.cfg.share_width.run(&mut widths, &extendeds);
         widths
     }
 
@@ -602,6 +681,7 @@ impl<'a> ColLine<'a> {
                 skips = elem.output(
                     &widths[i..],
                     tail.unwrap_or(elem),
+                    &self.cfg.share_width,
                 );
             }
             println!();
@@ -1108,15 +1188,15 @@ mod tests {
 
     #[test]
     fn collines_test() {
-        let mut colline = ColLine::new();
-        colline.push(Elem::new_left('1'), 0, 1, false);
-        colline.push(Elem::new_left('+'), 1, 1, false);
-        colline.push(Elem::new_left('2'), 2, 1, false);
-        colline.push(Elem::new_left('+'), 3, 1, false);
-        colline.push(Elem::new_left('3'), 4, 1, false);
-        colline.push(Elem::new_left('+'), 6, 1, false);
-        colline.push(Elem::new_left('4'), 7, 1, false);
-        colline.push(Elem::new_left(""), 5, 1, false);
+        let mut colline = ColLine::default();
+        colline.push(Elem::new_left('1'), 0, 1);
+        colline.push(Elem::new_left('+'), 1, 1);
+        colline.push(Elem::new_left('2'), 2, 1);
+        colline.push(Elem::new_left('+'), 3, 1);
+        colline.push(Elem::new_left('3'), 4, 1);
+        colline.push(Elem::new_left('+'), 6, 1);
+        colline.push(Elem::new_left('4'), 7, 1);
+        colline.push(Elem::new_left(""),  5, 1);
         colline.push(
             Elem::new(
                 "baz",
@@ -1126,13 +1206,11 @@ mod tests {
             ),
             0,
             1,
-            false,
         );
         colline.push(
             Elem::new_joint("exp", ""),
             0,
             1,
-            false,
         );
         colline.fill_hangs();
         colline.concat_hangs();
