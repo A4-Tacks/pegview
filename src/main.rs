@@ -120,6 +120,7 @@ fn main() {
         -i --ignore*=NAME           "Ignore a rule";
         -I --ignore-partial*=NAME   "Ignore a rule, support partial pattern";
         -u --unique-line            "One rule one line";
+        -F --first-width            "Share width to first";
         -L --last-width             "Share width to last";
            --share-width=STYLE      "Share width style (mixed, first, last)";
         -e --exclude-fails          "Exclude failed matches";
@@ -172,6 +173,7 @@ fn main() {
     let share_width_style = matched
         .opt_get_default("share-width", matched.opt_present("L")
             .then_some(ShareWidth::Last)
+            .or_else(|| matched.opt_present("F").then_some(ShareWidth::First))
             .unwrap_or_default())
         .unwrap_or_else(|e| {
             eprintln!("error: {e}");
