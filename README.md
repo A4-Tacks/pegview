@@ -13,4 +13,4 @@ Tree visualization of [rust-peg] trace
 - [x] Full-width tab characters
 - [x] Cached trace
 - [x] Char index location `1:4` -> `#3`
-- [ ] Precedence levels
+- [ ] Precedence levels, require kevinmehall/rust-peg/issues/400
