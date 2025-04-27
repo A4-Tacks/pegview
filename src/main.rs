@@ -119,6 +119,7 @@ fn main() {
         -c --center-rule            "Rule name to centered";
         -i --ignore*=NAME           "Ignore a rule";
         -I --ignore-partial*=NAME   "Ignore a rule, support partial pattern";
+        -Q --quiet*=NAME            "Quiet a rule sub tree";
         -u --unique-line            "One rule one line";
         -F --first-width            "Share width to first";
         -L --last-width             "Share width to last";
@@ -169,6 +170,7 @@ fn main() {
         .or_else(|| matched.opt_present("s").then(String::new));
     let ignore_set = BTreeSet::from_iter(matched.opt_strs("i"));
     let ignore_part_list = matched.opt_strs("I");
+    let quiet_set = BTreeSet::from_iter(matched.opt_strs("Q"));
     let show_cached = matched.opt_present("C");
     let share_width_style = matched
         .opt_get_default("share-width", matched.opt_present("L")
@@ -226,10 +228,13 @@ fn main() {
             .for_each(pair_fails)
     }
 
+    for actions in &mut regions {
+        quiet_rules(&quiet_set, actions);
+    }
+
     if exclude_fail {
         for actions in &mut regions {
-            let new = filter_fails(actions.drain(..));
-            actions.extend(new);
+            *actions = filter_fails(actions.drain(..));
         }
     }
 

@@ -794,6 +794,34 @@ where I: IntoIterator<Item = Action<'a>>,
     first
 }
 
+pub fn quiet_rules(map: &BTreeSet<String>, actions: &mut Vec<Action<'_>>) {
+    let mut level = 0usize;
+    actions.retain(|action| {
+        match action {
+            Action::Attempting { name, .. }
+            => if map.contains(*name)
+            {
+                level += 1;
+            },
+            Action::Matched { name, .. }
+            | Action::Failed { name, .. }
+            => if map.contains(*name)
+            {
+                level -= 1;
+                return false;
+            },
+            | Action::CachedMatch { .. }
+            | Action::CachedFail { .. }
+            | Action::Entering { .. }
+            | Action::Leaving { .. }
+            | Action::Begin { .. }
+            | Action::End
+            | Action::Other { .. } => (),
+        }
+        level == 0
+    });
+}
+
 pub fn pair_fails(actions: &mut Vec<Action<'_>>) {
     let mut attempted = vec![];
     for action in &mut *actions {
