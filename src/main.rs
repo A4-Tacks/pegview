@@ -194,6 +194,9 @@ fn main() {
 
     let buf = &mut String::new();
     if matched.free.is_empty() {
+        if atty::is(atty::Stream::Stdin) {
+            eprintln!("Warning: Reading PEG traces from tty");
+        }
         stdin().read_to_string(buf).unwrap();
     } else {
         for path in &matched.free {

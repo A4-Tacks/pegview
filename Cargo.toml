@@ -1,6 +1,6 @@
 [package]
 name = "pegview"
-version = "0.3.7"
+version = "0.3.8"
 edition = "2021"
 
 authors = ["A4-Tacks <wdsjxhno1001@163.com>"]
@@ -8,6 +8,7 @@ repository = "https://github.com/A4-Tacks/pegview"
 description = "Tree visualization of rust-peg trace"
 
 [dependencies]
+atty = "0.2.14"
 getopts = "0.2.21"
 getopts-macro = "0.1.2"
 itermaps = "0.3.3"
