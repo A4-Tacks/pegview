@@ -52,12 +52,12 @@ fn colline_from_src(src: &str, cfg: Config) -> ColLine<'_> {
     let mut i = 0;
     for ch in src.chars() {
         let elem = Elem::new_left(ch);
-        colline.push(elem, i, 1);
+        colline.push_solid(elem, i, 1);
         i += 1;
     }
     // 填充末尾, 防止末尾匹配下降过头
     let elem = Elem::new_fill();
-    colline.push(elem, i, 1);
+    colline.push_solid(elem, i, 1);
     colline
 }
 

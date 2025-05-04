@@ -561,6 +561,12 @@ impl<'a> ColLine<'a> {
         }
     }
 
+    pub fn push_solid(&mut self, elem: Elem<'a>, coli: u32, cols: u32) {
+        let uniq = take(&mut self.cfg.uniq);
+        self.push(elem, coli, cols);
+        self.cfg.uniq = uniq;
+    }
+
     pub fn push(&mut self, elem: Elem<'a>, coli: u32, cols: u32) {
         assert_ne!(cols, 0);
         let coli = coli.cinto::<usize>();
