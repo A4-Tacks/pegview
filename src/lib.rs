@@ -856,37 +856,40 @@ pub fn pair_fails(actions: &mut Vec<Action<'_>>) {
 pub fn split_regions<'a, I>(iter: I) -> Vec<Vec<Action<'a>>>
 where I: IntoIterator<Item = Action<'a>>,
 {
-    let actions = &mut vec![];
-    let mut acc = iter.into_iter()
-        .fold(vec![vec![]], |mut acc, action|
-    {
+    let stack = &mut vec![vec![]];
+    let mut regions = vec![];
+    let others = &mut vec![];
+
+    for action in iter {
+        if !action.is_other() && !others.is_empty() {
+            regions.push(take(others));
+        }
         match action {
-            | Action::Attempting { .. }
+            Action::Attempting { .. }
             | Action::Matched { .. }
             | Action::Failed { .. }
             | Action::Entering { .. }
             | Action::Leaving { .. }
             | Action::CachedMatch { .. }
             | Action::CachedFail { .. }
-            => actions.push(action),
-            | Action::Begin { .. }
-            => {
-                acc.last_mut().unwrap().append(actions);
-                acc.push(vec![action]);
-            },
-            | Action::End
-            => {
-                acc.last_mut().unwrap().append(actions);
-                acc.last_mut().unwrap().push(action);
-                acc.push(vec![]);
-            },
-            | Action::Other { .. }
-            => acc.last_mut().unwrap().push(action),
+            => stack.last_mut().unwrap().push(action),
+            Action::Begin { .. } => stack.push(vec![action]),
+            Action::End => regions.extend(stack.pop()),
+            Action::Other { .. } => others.push(action),
         }
-        acc
-    });
-    acc.last_mut().unwrap().append(actions);
-    acc
+    }
+
+    if !others.is_empty() {
+        regions.push(take(others));
+    }
+
+    while let Some(top) = stack.pop() {
+        if !top.is_empty() {
+            regions.push(top);
+        }
+    }
+
+    regions
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
