@@ -114,6 +114,13 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
     region.push(Action::Begin { source, from: default() });
 }
 
+fn check_width(action: &Action, start: u32, stop: u32) {
+    if stop < start {
+        eprintln!("Invalid span, stop ({stop}) < start ({start}):\n    {action}");
+        exit(1)
+    }
+}
+
 fn main() {
     let options = getopts_macro::getopts_options! {
         -c --center-rule            "Rule name to centered";
@@ -284,6 +291,7 @@ fn main() {
                     Action::Matched { name, start, stop } => {
                         if ignored(*name) { continue; }
                         let [start, stop]: [u32; 2] = [start, stop].map(tidx);
+                        check_width(action, start, stop);
                         let len = stop-start;
                         let name = if len == 0 {
                             let attr = Attr {
