@@ -61,7 +61,7 @@ fn colline_from_src(src: &str, cfg: Config) -> ColLine<'_> {
     colline
 }
 
-fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
+fn fake_src(regions: &mut Vec<Vec<Action<'_>>>, mut source: String) {
     if regions.len() != 1 || regions.iter()
         .any(|region| region.iter()
             .any(|action|
@@ -111,7 +111,7 @@ fn fake_src<'a>(regions: &mut Vec<Vec<Action<'a>>>, source: &'a mut String) {
     }
     source.push(eof);
 
-    region.push(Action::Begin { source, from: default() });
+    region.push(Action::Begin { source: source.into(), from: default() });
 }
 
 fn check_width(action: &Action, start: u32, stop: u32) {
@@ -121,7 +121,7 @@ fn check_width(action: &Action, start: u32, stop: u32) {
     }
 }
 
-fn main() {
+fn preset_matched(args: impl IntoIterator<Item = String>) -> getopts::Matches {
     let options = getopts_macro::getopts_options! {
         -c --center-rule            "Rule name to centered";
         -i --ignore*=NAME           "Ignore a rule";
@@ -144,7 +144,7 @@ fn main() {
         .parsing_style(getopts::ParsingStyle::FloatingFrees)
     };
 
-    let result = options.parse(args().skip(1));
+    let result = options.parse(args);
     let matched = match result {
         Ok(matched) => matched,
         Err(e) => {
@@ -170,191 +170,245 @@ fn main() {
         exit(0)
     }
 
-    let uniq_line = matched.opt_present("u");
-    let exclude_fail = matched.opt_present("e");
-    let pair_fail = matched.opt_present("r");
-    let mut fake_source = matched.opt_str("S")
-        .or_else(|| matched.opt_present("s").then(String::new));
-    let ignore_set = BTreeSet::from_iter(matched.opt_strs("i"));
-    let ignore_part_list = matched.opt_strs("I");
-    let quiet_set = BTreeSet::from_iter(matched.opt_strs("Q"));
-    let show_cached = matched.opt_present("C");
-    let share_width_style = matched
-        .opt_get_default("share-width", matched.opt_present("L")
-            .then_some(ShareWidth::Last)
-            .or_else(|| matched.opt_present("F").then_some(ShareWidth::First))
-            .unwrap_or_default())
-        .unwrap_or_else(|e| {
-            eprintln!("error: {e}");
-            exit(2)
-        });
+    matched
+}
 
-    CENTER_NAME.store(matched.opt_present("c"), Ordering::Release);
-    FULL_WIDTH_TAB.store(matched.opt_present("w"), Ordering::Release);
-    UNQUOTE_SPACE.store(matched.opt_present("q"), Ordering::Release);
+#[derive(Debug, Default, Clone)]
+struct InputConfig<'a> {
+    uniq_line:          bool,
+    exclude_fail:       bool,
+    pair_fail:          bool,
+    fake_source:        Option<String>,
+    ignore_set:         BTreeSet<String>,
+    ignore_part_list:   Vec<String>,
+    quiet_set:          BTreeSet<String>,
+    show_cached:        bool,
+    share_width_style:  ShareWidth,
+    files: &'a [String],
+}
 
-    let ignored = |s| {
-        ignore_set.contains(s)
-            || ignore_part_list.iter()
+impl<'a> From<&'a getopts::Matches> for InputConfig<'a> {
+    fn from(matched: &'a getopts::Matches) -> Self {
+        let input_cfg = Self {
+            uniq_line: matched.opt_present("u"),
+            exclude_fail: matched.opt_present("e"),
+            pair_fail: matched.opt_present("r"),
+            fake_source: matched.opt_str("S")
+                .or_else(|| matched.opt_present("s").then(String::new)),
+            ignore_set: BTreeSet::from_iter(matched.opt_strs("i")),
+            ignore_part_list: matched.opt_strs("I"),
+            quiet_set: BTreeSet::from_iter(matched.opt_strs("Q")),
+            show_cached: matched.opt_present("C"),
+            share_width_style: matched
+                .opt_get_default("share-width", matched.opt_present("L")
+                    .then_some(ShareWidth::Last)
+                    .or_else(|| matched.opt_present("F").then_some(ShareWidth::First))
+                    .unwrap_or_default())
+                .unwrap_or_else(|e| {
+                    eprintln!("error: {e}");
+                    exit(2)
+                }),
+            files: &matched.free,
+        };
+
+        CENTER_NAME.store(matched.opt_present("c"), Ordering::Release);
+        FULL_WIDTH_TAB.store(matched.opt_present("w"), Ordering::Release);
+        UNQUOTE_SPACE.store(matched.opt_present("q"), Ordering::Release);
+
+        input_cfg
+    }
+}
+
+impl InputConfig<'_> {
+    fn ignored(&self, s: &str) -> bool {
+        self.ignore_set.contains(s)
+            || self.ignore_part_list.iter()
                 .any(|p| str::contains(s, p))
-    };
+    }
 
-    let buf = &mut String::new();
-    if matched.free.is_empty() {
-        if atty::is(atty::Stream::Stdin) {
-            eprintln!("Warning: Reading PEG traces from tty");
-        }
-        stdin().read_to_string(buf).unwrap();
-    } else {
-        for path in &matched.free {
-            let mut f = match fs::File::open(path) {
-                Ok(f) => f,
-                Err(e) => {
-                    eprintln!("error {path:?}: {e}");
-                    exit(e.raw_os_error().unwrap_or(3));
-                },
-            };
-            f.read_to_string(buf).unwrap();
-            if buf.chars().next_back().unwrap_or('\n') != '\n' {
-                buf.push('\n')
+    fn read_input_files(&mut self) -> String {
+        let mut buf = String::new();
+
+        if self.files.is_empty() {
+            if atty::is(atty::Stream::Stdin) {
+                eprintln!("Warning: Reading PEG traces from tty");
             }
-        }
-    }
-
-    let actions = match parser::lines(buf) {
-        Ok(x) => x,
-        Err(e) => {
-            eprintln!("{e}");
-            exit(3);
-        },
-    };
-
-    let mut regions = split_regions(actions);
-
-    if pair_fail {
-        regions.iter_mut()
-            .filter(|region| region.iter()
-                .any(|action| action.is_begin()))
-            .for_each(pair_fails)
-    }
-
-    for actions in &mut regions {
-        quiet_rules(&quiet_set, actions);
-    }
-
-    if exclude_fail {
-        for actions in &mut regions {
-            *actions = filter_fails(actions.drain(..));
-        }
-    }
-
-    let cfg = Config {
-        uniq: uniq_line,
-        share_width: share_width_style,
-    };
-
-    if let Some(source) = &mut fake_source {
-        fake_src(&mut regions, source);
-    }
-
-    for actions in &regions {
-        println!("----------------------------------------------------------");
-        if let Some((src, from)) = actions.iter().find_map(Action::as_begin) {
-            let from = from.get_char_index(src);
-            let mut colline = colline_from_src(&src[from..], cfg.clone());
-            let tidx = |loc: &Loc| {
-                let ridx = loc.get_char_index(src)
-                    .checked_sub(from)
-                    .unwrap_or_else(|| {
-                        panic!("Trace location {loc} less than `from {from}`")
-                    });
-                ridx.cinto::<u32>()
-            };
-
-            println!("Trace Source: {:?}", &src[from..]);
-
-            for action in actions {
-                match action {
-                    Action::Other { text } => {
-                        println!("{text}");
-                    },
-                    Action::Begin { source, from: _ } => {
-                        debug_assert_eq!(src, *source,
-                                        "Possible duplicate [PEG_INPUT_START]");
-                    },
-                    _ => (),
-                }
-            }
-
-            for action in actions {
-                match action {
-                    Action::Matched { name, start, stop } => {
-                        if ignored(*name) { continue; }
-                        let [start, stop]: [u32; 2] = [start, stop].map(tidx);
-                        check_width(action, start, stop);
-                        let len = stop-start;
-                        let name = if len == 0 {
-                            let attr = Attr {
-                                zero_width: true,
-                                ..default()
-                            };
-                            Entry::Str(name, attr)
-                        } else {
-                            (*name).into()
-                        };
-                        let cols = len.max(1);
-                        let elem = Elem::new_joint(name, "");
-                        colline.push(elem, start, cols);
-                    },
-                    Action::Failed { name, start } => {
-                        if ignored(*name) { continue; }
-                        let start = tidx(start);
-                        let elem = Elem::new(
-                            *name,
-                            " ",
-                            Sides::bit_new(0b0101_0000),
-                            ' ',
-                        );
-                        colline.push(elem, start, 1);
-                    },
-                    Action::CachedMatch { name, start } if show_cached => {
-                        if ignored(*name) { continue; }
-                        let start = tidx(start);
-                        let elem = Elem::new(
-                            Entry::Str(name, Attr {
-                                cached_match: true,
-                                ..default()
-                            }),
-                            " ",
-                            Sides::bit_new(0b0101_0000),
-                            ' ',
-                        );
-                        colline.push(elem, start, 1);
-                    },
-                    Action::CachedFail { name, start } if show_cached => {
-                        if ignored(*name) { continue; }
-                        let start = tidx(start);
-                        let elem = Elem::new(
-                            Entry::Str(name, Attr {
-                                cached_fail: true,
-                                ..default()
-                            }),
-                            " ",
-                            Sides::bit_new(0b0101_0000),
-                            ' ',
-                        );
-                        colline.push(elem, start, 1);
-                    },
-                    _ => (),
-                }
-            }
-            colline.fill_hangs();
-            colline.concat_hangs();
-            colline.output();
+            stdin().read_to_string(&mut buf).unwrap();
         } else {
-            for action in actions {
+            for path in self.files {
+                let mut f = match fs::File::open(path) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        eprintln!("error {path:?}: {e}");
+                        exit(e.raw_os_error().unwrap_or(3));
+                    },
+                };
+                f.read_to_string(&mut buf).unwrap();
+                if buf.chars().next_back().unwrap_or('\n') != '\n' {
+                    buf.push('\n')
+                }
+            }
+        }
+
+        buf
+    }
+
+    fn parse_regions<'a>(&mut self, source: &'a str) -> Vec<Vec<Action<'a>>> {
+        let actions = match parser::lines(source) {
+            Ok(x) => x,
+            Err(e) => {
+                eprintln!("{e}");
+                exit(3);
+            },
+        };
+
+        let mut regions = split_regions(actions);
+
+        if self.pair_fail {
+            regions.iter_mut()
+                .filter(|region| region.iter()
+                    .any(|action| action.is_begin()))
+                .for_each(pair_fails)
+        }
+
+        for actions in &mut regions {
+            quiet_rules(&self.quiet_set, actions);
+        }
+
+        if self.exclude_fail {
+            for actions in &mut regions {
+                *actions = filter_fails(actions.drain(..));
+            }
+        }
+
+        if let Some(source) = self.fake_source.take() {
+            fake_src(&mut regions, source);
+        }
+
+        regions
+    }
+
+    fn run_regions(&self, regions: &[Vec<Action<'_>>]) {
+        for region in regions {
+            println!("----------------------------------------------------------");
+            self.run_region(region);
+        }
+    }
+
+    fn run_region(&self, region: &[Action<'_>]) {
+        let cfg = Config {
+            uniq: self.uniq_line,
+            share_width: self.share_width_style,
+        };
+
+        let Some((src, from)) = region.iter().find_map(Action::as_begin) else {
+            for action in region {
                 println!("{action}");
             }
+            return;
+        };
+
+        let from = from.get_char_index(src);
+        let mut colline = colline_from_src(&src[from..], cfg.clone());
+        let tidx = |loc: &Loc| {
+            let ridx = loc.get_char_index(src)
+                .checked_sub(from)
+                .unwrap_or_else(|| {
+                    panic!("Trace location {loc} less than `from {from}`")
+                });
+            ridx.cinto::<u32>()
+        };
+
+        println!("Trace Source: {:?}", &src[from..]);
+
+        for action in region {
+            match action {
+                Action::Other { text } => {
+                    println!("{text}");
+                },
+                Action::Begin { source, from: _ } => {
+                    debug_assert_eq!(src, *source,
+                                    "Possible duplicate [PEG_INPUT_START]");
+                },
+                _ => (),
+            }
         }
+
+        for action in region {
+            match action {
+                Action::Matched { name, start, stop } => {
+                    if self.ignored(name) { continue; }
+                    let [start, stop]: [u32; 2] = [start, stop].map(tidx);
+                    check_width(action, start, stop);
+                    let len = stop-start;
+                    let name = if len == 0 {
+                        let attr = Attr {
+                            zero_width: true,
+                            ..default()
+                        };
+                        Entry::Str(name, attr)
+                    } else {
+                        (*name).into()
+                    };
+                    let cols = len.max(1);
+                    let elem = Elem::new_joint(name, "");
+                    colline.push(elem, start, cols);
+                },
+                Action::Failed { name, start } => {
+                    if self.ignored(name) { continue; }
+                    let start = tidx(start);
+                    let elem = Elem::new(
+                        *name,
+                        " ",
+                        Sides::bit_new(0b0101_0000),
+                        ' ',
+                    );
+                    colline.push(elem, start, 1);
+                },
+                Action::CachedMatch { name, start } if self.show_cached => {
+                    if self.ignored(name) { continue; }
+                    let start = tidx(start);
+                    let elem = Elem::new(
+                        Entry::Str(name, Attr {
+                            cached_match: true,
+                            ..default()
+                        }),
+                        " ",
+                        Sides::bit_new(0b0101_0000),
+                        ' ',
+                    );
+                    colline.push(elem, start, 1);
+                },
+                Action::CachedFail { name, start } if self.show_cached => {
+                    if self.ignored(name) { continue; }
+                    let start = tidx(start);
+                    let elem = Elem::new(
+                        Entry::Str(name, Attr {
+                            cached_fail: true,
+                            ..default()
+                        }),
+                        " ",
+                        Sides::bit_new(0b0101_0000),
+                        ' ',
+                    );
+                    colline.push(elem, start, 1);
+                },
+                _ => (),
+            }
+        }
+        colline.fill_hangs();
+        colline.concat_hangs();
+        colline.output();
     }
+}
+
+fn main() {
+    let matched = preset_matched(args().skip(1));
+
+    let mut input_cfg = InputConfig::from(&matched);
+    let source = input_cfg.read_input_files();
+
+    let regions = input_cfg.parse_regions(&source);
+
+    input_cfg.run_regions(&regions);
 }

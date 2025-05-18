@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::BTreeSet,
     fmt::{Debug, Display},
     iter::{once, repeat, repeat_n},
@@ -161,6 +162,7 @@ impl Side {
     pub const LD: Self = Self::bit_new(0b0110);
     pub const RD: Self = Self::bit_new(0b0101);
 
+    /// high -> low: up, down, left, right
     pub const fn bit_new(n: u8) -> Self {
         Self {
             up:     n>>3&1 != 0,
@@ -220,6 +222,7 @@ impl BitAndAssign for Sides {
 impl Sides {
     const EMPTY: Self = Self(Side::EMPTY, Side::EMPTY);
 
+    /// high -> low: left, right
     pub const fn bit_new(n: u8) -> Self {
         Self(Side::bit_new(n>>4), Side::bit_new(n))
     }
@@ -468,7 +471,7 @@ impl<'a> Elem<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum ShareWidth {
     Mixed,
     First,
@@ -515,7 +518,7 @@ impl ShareWidth {
 
     /// extendeds: `&[(i, cols, width)]`
     fn run(&self,
-        widths: &mut Vec<usize>,
+        widths: &mut [usize],
         extendeds: &[(usize, usize, usize)],
     ) {
         for &(i, cols, width) in extendeds {
@@ -916,7 +919,7 @@ pub enum Action<'a> {
         level: u32,
     },
     Begin {
-        source: &'a str,
+        source: Cow<'a, str>,
         from: Loc,
     },
     End,
@@ -924,7 +927,7 @@ pub enum Action<'a> {
         text: &'a str,
     },
 }
-impl<'a> Action<'a> {
+impl Action<'_> {
     pub fn locs(&self) -> Option<(Loc, Option<Loc>)> {
         Some(match self {
             Action::Matched { start, stop, .. }
@@ -992,7 +995,7 @@ impl<'a> Action<'a> {
         matches!(self, Self::Other { .. })
     }
 
-    pub fn as_begin(&self) -> Option<(&'a str, &Loc)> {
+    pub fn as_begin(&self) -> Option<(&str, &Loc)> {
         if let Self::Begin { source, from } = self {
             Some((source, from))
         } else {
@@ -1058,7 +1061,7 @@ peg::parser!(pub grammar parser() for str {
             source:$( (!"[PEG_TRACE_START]" [^'\r' | '\n']*)**nl() )
             nl()?
             "[PEG_TRACE_START]"
-            { Action::Begin { source, from: from.unwrap_or_default() } }
+            { Action::Begin { source: source.into(), from: from.unwrap_or_default() } }
         / "[PEG_TRACE_STOP]"
             { Action::End }
         / !("[PEG_TRACE]" / "[PEG_INPUT_START]" / "[PEG_TRACE_STOP]" / ![_])
