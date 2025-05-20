@@ -998,6 +998,17 @@ impl Action<'_> {
         matches!(self, Self::Other { .. })
     }
 
+    #[must_use]
+    pub fn is_tracing(&self) -> bool {
+        matches!(self,
+            | Self::Matched { .. }
+            | Self::Failed { .. }
+            | Self::CachedMatch { .. }
+            | Self::CachedFail { .. }
+            | Self::Entering { .. }
+            | Self::Leaving { .. })
+    }
+
     pub fn as_begin(&self) -> Option<(&str, &Loc)> {
         if let Self::Begin { source, from } = self {
             Some((source, from))

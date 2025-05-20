@@ -61,17 +61,29 @@ fn colline_from_src(src: &str, cfg: Config) -> ColLine<'_> {
     colline
 }
 
+fn trace_regions<'a, 'b, I>(iter: I) -> impl Iterator<Item = &'b mut Vec<Action<'a>>>
+where I: IntoIterator<Item = &'b mut Vec<Action<'a>>>,
+      I::IntoIter: 'b,
+      'a: 'b,
+{
+    iter.into_iter()
+        .filter(move |region| region.iter().any(|action| {
+            action.is_begin() || action.is_end()
+        }))
+}
+
 fn fake_src(regions: &mut Vec<Vec<Action<'_>>>, mut source: String) {
-    if regions.len() != 1 || regions.iter()
-        .any(|region| region.iter()
-            .any(|action|
-                action.is_begin() || action.is_end()))
-    {
+    if trace_regions(&mut *regions).next().is_some() {
         eprintln!("Only support one region \
                 (no PEG_INPUT_START PEG_INPUT_START PEG_TRACE_STOP)");
         exit(3);
     }
-    let region = &mut regions[0];
+    let region = regions.iter_mut()
+        .find(|region| region.iter().any(Action::is_tracing))
+        .unwrap_or_else(|| {
+            eprintln!("Cannot find valided tracings ([PEG_TRACE] Matched ...)");
+            exit(3);
+        });
     let compat_locs = region.iter()
         .filter_map(Action::locs)
         .map(|(start, stop)| {
@@ -265,9 +277,7 @@ impl InputConfig<'_> {
         let mut regions = split_regions(actions);
 
         if self.pair_fail {
-            regions.iter_mut()
-                .filter(|region| region.iter()
-                    .any(|action| action.is_begin()))
+            trace_regions(&mut regions)
                 .for_each(pair_fails)
         }
 
