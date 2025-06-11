@@ -135,24 +135,25 @@ fn check_width(action: &Action, start: u32, stop: u32) {
 
 fn preset_matched(args: impl IntoIterator<Item = String>) -> getopts::Matches {
     let options = getopts_macro::getopts_options! {
-        -c --center-rule            "Rule name to centered";
-        -i --ignore*=NAME           "Ignore a rule";
-        -I --ignore-partial*=NAME   "Ignore a rule, support partial pattern";
-        -Q --quiet*=NAME            "Quiet a rule sub tree";
-        -u --unique-line            "One rule one line";
-        -F --first-width            "Share width to first";
-        -L --last-width             "Share width to last";
-           --share-width=STYLE      "Share width style (mixed, first, last)";
-        -e --exclude-fails          "Exclude failed matches";
-        -r --pair-fails             "Add unpaired failed matches";
-        -w --full-width-tab-chars   "Full-width tab chars";
-        -s --fake-source            "Using oneline fake source";
-        -S --fake-source-from=SRC   "Using oneline fake source";
-        -q --unquote-space          "Unquote space";
-        -C --show-cached            "Show cached match and fail";
-        -h --help*                  "Show help messages";
-           --example                "Show example usage";
-        -v --version                "Show version";
+        -c --center-rule                "Rule name to centered";
+        -i --ignore*=NAME               "Ignore a rule";
+        -I --ignore-partial*=NAME       "Ignore a rule, support partial pattern";
+        -z --zero-width-ignore*=NAME    "Ignore a rule, when zero width matched";
+        -Q --quiet*=NAME                "Quiet a rule sub tree";
+        -u --unique-line                "One rule one line";
+        -F --first-width                "Share width to first";
+        -L --last-width                 "Share width to last";
+           --share-width=STYLE          "Share width style (mixed, first, last)";
+        -e --exclude-fails              "Exclude failed matches";
+        -r --pair-fails                 "Add unpaired failed matches";
+        -w --full-width-tab-chars       "Full-width tab chars";
+        -s --fake-source                "Using oneline fake source";
+        -S --fake-source-from=SRC       "Using oneline fake source";
+        -q --unquote-space              "Unquote space";
+        -C --show-cached                "Show cached match and fail";
+        -h --help*                      "Show help messages";
+           --example                    "Show example usage";
+        -v --version                    "Show version";
         .parsing_style(getopts::ParsingStyle::FloatingFrees)
     };
 
@@ -192,6 +193,7 @@ struct InputConfig<'a> {
     pair_fail:          bool,
     fake_source:        Option<String>,
     ignore_set:         BTreeSet<String>,
+    ignore_zw_set:      BTreeSet<String>,
     ignore_part_list:   Vec<String>,
     quiet_set:          BTreeSet<String>,
     show_cached:        bool,
@@ -208,6 +210,7 @@ impl<'a> From<&'a getopts::Matches> for InputConfig<'a> {
             fake_source: matched.opt_str("S")
                 .or_else(|| matched.opt_present("s").then(String::new)),
             ignore_set: BTreeSet::from_iter(matched.opt_strs("i")),
+            ignore_zw_set: BTreeSet::from_iter(matched.opt_strs("z")),
             ignore_part_list: matched.opt_strs("I"),
             quiet_set: BTreeSet::from_iter(matched.opt_strs("Q")),
             show_cached: matched.opt_present("C"),
@@ -351,6 +354,7 @@ impl InputConfig<'_> {
                     let [start, stop]: [u32; 2] = [start, stop].map(tidx);
                     check_width(action, start, stop);
                     let len = stop-start;
+                    if len == 0 && self.ignore_zw_set.contains(*name) { continue }
                     let name = if len == 0 {
                         let attr = Attr {
                             zero_width: true,
