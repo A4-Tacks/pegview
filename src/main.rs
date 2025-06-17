@@ -241,7 +241,7 @@ impl InputConfig<'_> {
                 .any(|p| str::contains(s, p))
     }
 
-    fn read_input_files(&mut self) -> String {
+    fn read_input_files(&self) -> String {
         let mut buf = String::new();
 
         if self.files.is_empty() {
@@ -322,7 +322,7 @@ impl InputConfig<'_> {
         };
 
         let from = from.get_char_index(src);
-        let mut colline = colline_from_src(&src[from..], cfg.clone());
+        let mut colline = colline_from_src(&src[from..], cfg);
         let tidx = |loc: &Loc| {
             let ridx = loc.get_char_index(src)
                 .checked_sub(from)

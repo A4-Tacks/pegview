@@ -806,6 +806,7 @@ where I: IntoIterator<Item = Action<'a>>,
 pub fn quiet_rules(map: &BTreeSet<String>, actions: &mut Vec<Action<'_>>) {
     let mut level = 0usize;
     actions.retain(|action| {
+        let old_quiet_stat = level == 0;
         match action {
             Action::Attempting { name, .. }
             => if map.contains(*name)
@@ -817,7 +818,7 @@ pub fn quiet_rules(map: &BTreeSet<String>, actions: &mut Vec<Action<'_>>) {
             => if map.contains(*name)
             {
                 level -= 1;
-                return false;
+                return level == 0;
             },
             | Action::CachedMatch { .. }
             | Action::CachedFail { .. }
@@ -827,7 +828,7 @@ pub fn quiet_rules(map: &BTreeSet<String>, actions: &mut Vec<Action<'_>>) {
             | Action::End
             | Action::Other { .. } => (),
         }
-        level == 0
+        old_quiet_stat
     });
 }
 
