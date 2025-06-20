@@ -357,6 +357,14 @@ pub struct Elem<'a> {
 impl<'a> Elem<'a> {
     const JOINT_CH: char = '─';
 
+    fn joint_ch() -> char {
+        if FULL_WIDTH_TAB.load(Acquire) {
+            '-'
+        } else {
+            Self::JOINT_CH
+        }
+    }
+
     pub fn new_region(
         left: impl Into<Entry<'a>>,
         right: impl Into<Entry<'a>>,
@@ -366,7 +374,7 @@ impl<'a> Elem<'a> {
             left: left.into(),
             right: right.into(),
             sides,
-            fill: Self::JOINT_CH,
+            fill: Self::joint_ch(),
             exts: 0,
         }
     }
