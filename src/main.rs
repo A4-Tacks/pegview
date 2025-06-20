@@ -166,9 +166,8 @@ fn preset_matched(args: impl IntoIterator<Item = String>) -> getopts::Matches {
         },
     };
     if matched.opt_present("h") {
-        let biref = options.short_usage(BINNAME);
-        let about = "Parse rust-peg traces, convert to tree";
-        let info = format!("{biref} [FILES..]\n{about}");
+        let about = "Parse rust-peg traces, convert to tree view";
+        let info = format!("Usage: {BINNAME} [Options].. [FILES]..\n{about}");
         let usage = options.usage(&info);
         println!("{usage}");
         println!("Report bugs from {} issues", env!("CARGO_PKG_REPOSITORY"));
