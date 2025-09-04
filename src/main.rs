@@ -148,7 +148,7 @@ fn preset_matched(args: impl IntoIterator<Item = String>) -> getopts::Matches {
         -r --pair-fails                 "Add unpaired failed matches";
         -w --full-width-tab-chars       "Full-width tab chars";
         -s --fake-source                "Using oneline fake source";
-        -S --fake-source-from=SRC       "Using oneline fake source";
+        -S --fake-source-from=SRC       "Using fake source";
         -q --unquote-space              "Unquote space";
         -C --show-cached                "Show cached match and fail";
         -h --help*                      "Show help messages";
