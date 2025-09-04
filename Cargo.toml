@@ -1,6 +1,6 @@
 [package]
 name = "pegview"
-version = "0.3.15"
+version = "0.3.16"
 edition = "2021"
 
 authors = ["A4-Tacks <wdsjxhno1001@163.com>"]
@@ -12,6 +12,6 @@ atty = "0.2.14"
 getopts = "0.2.21"
 getopts-macro = "0.1.2"
 itermaps = "0.3.3"
-line-column = "0.1.2"
+line-column = "0.2.0"
 peg = "0.8.5"
 unicode-width = "0.2.0"
