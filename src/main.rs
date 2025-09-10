@@ -287,14 +287,14 @@ impl InputConfig<'_> {
             quiet_rules(&self.quiet_set, actions);
         }
 
+        if let Some(source) = self.fake_source.take() {
+            fake_src(&mut regions, source);
+        }
+
         if self.exclude_fail {
             for actions in &mut regions {
                 *actions = filter_fails(actions.drain(..));
             }
-        }
-
-        if let Some(source) = self.fake_source.take() {
-            fake_src(&mut regions, source);
         }
 
         regions
