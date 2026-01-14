@@ -45,7 +45,20 @@ $ pegview <<\EOF
 [PEG_TRACE] Matched rule `atom` at 1:1 to 1:6
 [PEG_TRACE] Matched rule `add` at 1:1 to 1:6
 [PEG_TRACE_STOP]
-EOF"#};
+EOF
+
+For rust-peg using this rule e.g `trace(<expr()>)`:
+    rule trace<T>(r: rule<T>) -> T
+        = #{|input, pos| {
+            #[cfg(feature = "trace")]
+            println!("[PEG_INPUT_START] from {pos}\n{input}\n[PEG_TRACE_START]");
+            ::peg::RuleResult::Matched(pos, ())
+        }}
+        r:r()? {?
+            #[cfg(feature = "trace")]
+            println!("[PEG_TRACE_STOP]");
+            r.ok_or("")
+        }"#};
 
 fn colline_from_src(src: &str, cfg: Config) -> ColLine<'_> {
     let mut colline = ColLine::new(cfg);
